@@ -1,7 +1,7 @@
 #!/usr/bin/python
 """
-Emotion Recognition Module
-Uses a pretrained CNN model to classify emotions in face images.
+Emotion Recognition Module - DeepFace Version
+Uses DeepFace library with multiple pre-trained models for better emotion classification.
 """
 
 import cv2
@@ -9,97 +9,33 @@ import numpy as np
 import os
 import sys
 import json
-from tensorflow.keras.models import load_model
-import tensorflow as tf
-from tensorflow.keras import layers
-from tensorflow.keras.utils import register_keras_serializable
+from deepface import DeepFace
 
-@register_keras_serializable(package="Custom")   
-class SEBlock(layers.Layer):
-    def __init__(self, channels, reduction_ratio=16, **kwargs):
-        super(SEBlock, self).__init__(**kwargs)
-        self.channels = channels
-        self.reduction_ratio = reduction_ratio
-        self.squeeze = layers.GlobalAveragePooling2D()
-        self.fc1 = layers.Dense(channels // reduction_ratio, activation='relu')
-        self.fc2 = layers.Dense(channels, activation='sigmoid')
-
-    def call(self, inputs):
-        se = self.squeeze(inputs)               
-        se = self.fc1(se)                      
-        se = self.fc2(se)                      
-        se = tf.reshape(se, [-1, 1, 1, self.channels])
-        return inputs * se                     
-
-    def get_config(self):
-        config = super(SEBlock, self).get_config()
-        config.update({
-            "channels": self.channels,
-            "reduction_ratio": self.reduction_ratio
-        })
-        return config
-    
 class EmotionRecognizer:
-    def __init__(self, model_path="../models/emotion_model.keras"):
+    def __init__(self, model_path=None):
         """
-        Initialize the emotion recognizer with a pretrained model.
+        Initialize the emotion recognizer with DeepFace.
         
         Args:
-            model_path (str): Path to the pretrained emotion recognition model
+            model_path (str): Not used with DeepFace (kept for compatibility)
         """
-        self.model_path = model_path
+        # DeepFace emotion labels (standardized)
         self.emotion_labels = {
-            0: 'Angry',
-            1: 'Disgust', 
-            2: 'Fear',
-            3: 'Happy',
-            4: 'Sad',
-            5: 'Surprise',
-            6: 'Neutral'
+            'angry': 'Angry',
+            'disgust': 'Disgust', 
+            'fear': 'Fear',
+            'happy': 'Happy',
+            'sad': 'Sad',
+            'surprise': 'Surprise',
+            'neutral': 'Neutral'
         }
         
-        # Load the pretrained model
-        try:
-            self.model = load_model(model_path, custom_objects = {'SEBlock': SEBlock})
-            print(f"Emotion recognition model loaded successfully from {model_path}")
-            
-        except Exception as e:
-            print(f"Error loading model from {model_path}: {e}")
-            print("Please ensure the emotion_model.keras file is in the models directory")
-            raise
-
-    def preprocess_face(self, face_image):
-        """
-        Preprocess face image for emotion recognition.
-        The FER-2013 model expects 48x48 grayscale images.
-        
-        Args:
-            face_image (numpy.ndarray): Input face image
-            
-        Returns:
-            numpy.ndarray: Preprocessed image ready for model prediction
-        """
-        # Convert to grayscale if needed
-        if len(face_image.shape) == 3:
-            gray_face = cv2.cvtColor(face_image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray_face = face_image.copy()
-        
-        # Resize to 48x48 (FER-2013 model input size)
-        resized_face = cv2.resize(gray_face, (224, 224))
-        
-        # Normalize pixel values to [0, 1]
-        normalized_face = resized_face.astype('float32') / 255.0
-        
-        # Reshape for model input: (1, 224, 224, 1)
-        # 1 = batch size, 224x224 = image dimensions, 1 = grayscale channel
-        preprocessed_face = normalized_face.reshape(1, 224, 224, 1)
-        
-        return preprocessed_face
+        print("DeepFace emotion recognition initialized!")
+        print("Note: Models will be downloaded on first use (may take a moment)")
 
     def predict_emotion(self, face_image):
         """
-        Predict emotion for a single face image.
+        Predict emotion for a single face image using DeepFace.
         
         Args:
             face_image (numpy.ndarray): Face image
@@ -107,26 +43,48 @@ class EmotionRecognizer:
         Returns:
             tuple: (predicted_emotion_string, confidence_score, all_probabilities)
         """
-        # Preprocess the face image
-        preprocessed_face = self.preprocess_face(face_image)
-        
-        # Make prediction using the CNN model
-        predictions = self.model.predict(preprocessed_face, verbose=0)
-        
-        # Get the class with highest probability
-        predicted_class = np.argmax(predictions[0])
-        confidence = float(np.max(predictions[0]))
-        
-        # Convert to emotion label
-        predicted_emotion = self.emotion_labels[predicted_class]
-        
-        # Get all probabilities for detailed analysis
-        all_probabilities = {
-            self.emotion_labels[i]: float(predictions[0][i]) 
-            for i in range(len(self.emotion_labels))
-        }
-        
-        return predicted_emotion, confidence, all_probabilities
+        try:
+            # DeepFace expects RGB images, OpenCV loads as BGR
+            if len(face_image.shape) == 3:
+                rgb_image = cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB)
+            else:
+                rgb_image = face_image
+            
+            # Use DeepFace to analyze emotion
+            # enforce_detection=False allows processing even if face detection fails
+            result = DeepFace.analyze(
+                img_path=rgb_image, 
+                actions=['emotion'], 
+                enforce_detection=False,
+                silent=True,  # Suppress verbose output
+                detector_backend='opencv'  # Use OpenCV backend instead of default
+            )
+            
+            # DeepFace returns a list, take first result
+            if isinstance(result, list):
+                emotion_data = result[0]['emotion']
+            else:
+                emotion_data = result['emotion']
+            
+            # Find the emotion with highest confidence
+            predicted_emotion_key = max(emotion_data, key=emotion_data.get)
+            confidence = emotion_data[predicted_emotion_key] / 100.0  # Convert percentage to 0-1
+            
+            # Convert to our standard label format
+            predicted_emotion = self.emotion_labels.get(predicted_emotion_key, predicted_emotion_key.capitalize())
+            
+            # Convert all probabilities to our format
+            all_probabilities = {
+                self.emotion_labels.get(key, key.capitalize()): value / 100.0 
+                for key, value in emotion_data.items()
+            }
+            
+            return predicted_emotion, confidence, all_probabilities
+            
+        except Exception as e:
+            print(f"Error in DeepFace emotion prediction: {e}")
+            # Fallback to neutral if prediction fails
+            return "Neutral", 0.5, {emotion: 0.0 for emotion in self.emotion_labels.values()}
 
     def process_face_images(self, base_filename):
         """
@@ -207,13 +165,14 @@ def main():
     """
     if len(sys.argv) < 2:
         print("Usage: python3 emotion_recognition.py <base_filename> [model_path]")
-        print("Example: python3 emotion_recognition.py ../data/images/happy (1)")
+        print("Example: python3 emotion_recognition.py ../output/happy_1")
         print("\nThis script processes face images created by the face detection module.")
         print("It looks for files like: <base_filename>_face_0.jpg, <base_filename>_face_1.jpg, etc.")
+        print("\nNote: Using DeepFace - models will be downloaded automatically on first use.")
         return
     
     base_filename = sys.argv[1]
-    model_path = sys.argv[2] if len(sys.argv) > 2 else "../models/emotion_model.keras"
+    model_path = sys.argv[2] if len(sys.argv) > 2 else None  # Not used with DeepFace
     
     try:
         # Initialize emotion recognizer
@@ -230,7 +189,7 @@ def main():
         recognizer.save_results(results, base_filename)
         
         # Print summary
-        print(f"\nEmotion Recognition Summary:")
+        print(f"\nEmotion Recognition Summary (DeepFace):")
         print(f"Processed {len(results)} face(s)")
         for result in results:
             print(f"Face {result['face_index']}: {result['predicted_emotion']} "
@@ -238,6 +197,7 @@ def main():
         
     except Exception as e:
         print(f"Error during emotion recognition: {e}")
+        print("Make sure DeepFace is installed: pip install deepface")
         return 1
 
 if __name__ == "__main__":
