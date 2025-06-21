@@ -18,7 +18,7 @@ public:
      * Constructor: Initialize the face detector with cascade file
      * @param cascade_file Path to Haar cascade classifier XML file
      */
-    FaceDetector(const std::string& cascade_file = "../models/haarcascade_frontalface_alt.xml");
+    FaceDetector(const std::string& cascade_file = "models/haarcascade_frontalface_alt.xml");
 
     /**
      * Main face detection method using Viola-Jones algorithm

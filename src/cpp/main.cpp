@@ -31,17 +31,17 @@ void printUsage(const char* program_name) {
     std::cout << std::endl;
     std::cout << "  # Custom paths for complete integration" << std::endl;
     std::cout << "  " << program_name << " --integrate image.jpg \\" << std::endl;
-    std::cout << "    --cascade ../models/haarcascade_frontalface_alt.xml \\" << std::endl;
+    std::cout << "    --cascade models/haarcascade_frontalface_alt.xml \\" << std::endl;
     std::cout << "    --script ../src/python/emotion_recognition.py \\" << std::endl;
-    std::cout << "    --model ../models/emotion_model.keras" << std::endl;
+    std::cout << "    --model models/emotion_model.keras" << std::endl;
 }
 
 struct ProgramOptions {
     std::string mode;
     std::string image_path;
-    std::string cascade_path = "../models/haarcascade_frontalface_alt.xml";
+    std::string cascade_path = "models/haarcascade_frontalface_alt.xml";
     std::string script_path = "../src/python/emotion_recognition.py";
-    std::string model_path = "../models/emotion_model.keras";
+    std::string model_path = "models/emotion_model.keras";
     std::string output_dir   = "./output";
     bool valid = false;
 };

@@ -25,9 +25,9 @@ public:
      * @param emotion_model Path to emotion recognition model
      */
     Integration(
-        const std::string& cascade_file = "../models/haarcascade_frontalface_alt.xml",
+        const std::string& cascade_file = "models/haarcascade_frontalface_alt.xml",
         const std::string& python_script = "../src/python/emotion_recognition.py",
-        const std::string& emotion_model = "../models/emotion_model.keras"
+        const std::string& emotion_model = "models/emotion_model.keras"
     );
 
     /**
