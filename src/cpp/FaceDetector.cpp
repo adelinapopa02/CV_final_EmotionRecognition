@@ -1,4 +1,5 @@
 #include "FaceDetector.h"
+#include "Colors.h"
 #include <iostream>
 #include <filesystem>
 #include <algorithm>
@@ -8,7 +9,7 @@ FaceDetector::FaceDetector(const std::string& cascade_file) : cascade_path(casca
     if (!face_cascade.load(cascade_path)) {
         throw std::runtime_error("Error loading cascade file: " + cascade_path);
     }
-    std::cout << "Face detector initialized successfully!" << std::endl;
+    std::cout << Colors::success("Face detector initialized successfully!") << std::endl;
 }
 
 // Multiple preprocessing strategies for debugging
@@ -33,28 +34,28 @@ cv::Mat FaceDetector::preprocessImage(const cv::Mat& image) {
 std::vector<cv::Rect> FaceDetector::detectFaces(const cv::Mat& image) {
     cv::Mat gray_image = preprocessImage(image);
     
-    std::cout << "=== DEBUGGING FACE DETECTION ===" << std::endl;
-    std::cout << "Image size: " << image.cols << "x" << image.rows << std::endl;
+    std::cout << Colors::bold("=== DEBUGGING FACE DETECTION ===") << std::endl;
+    std::cout << Colors::info("Image size: ") << image.cols << "x" << image.rows << std::endl;
     
     // Strategy 1: Very sensitive detection
     std::vector<cv::Rect> faces1;
     face_cascade.detectMultiScale(gray_image, faces1, 1.05, 2, 0, cv::Size(20, 20));
-    std::cout << "Strategy 1 (very sensitive): " << faces1.size() << " faces" << std::endl;
+    std::cout << Colors::info("Strategy 1 (very sensitive): ") << faces1.size() << " faces" << std::endl;
     
     // Strategy 2: Standard detection
     std::vector<cv::Rect> faces2;
     face_cascade.detectMultiScale(gray_image, faces2, 1.1, 3, 0, cv::Size(30, 30));
-    std::cout << "Strategy 2 (standard): " << faces2.size() << " faces" << std::endl;
+    std::cout << Colors::info("Strategy 2 (standard): ") << faces2.size() << " faces" << std::endl;
     
     // Strategy 3: Conservative detection
     std::vector<cv::Rect> faces3;
     face_cascade.detectMultiScale(gray_image, faces3, 1.1, 5, 0, cv::Size(40, 40));
-    std::cout << "Strategy 3 (conservative): " << faces3.size() << " faces" << std::endl;
+    std::cout << Colors::info("Strategy 3 (conservative): ") << faces3.size() << " faces" << std::endl;
     
     // Strategy 4: Try with different scale factors
     std::vector<cv::Rect> faces4;
     face_cascade.detectMultiScale(gray_image, faces4, 1.03, 3, 0, cv::Size(25, 25));
-    std::cout << "Strategy 4 (small scale factor): " << faces4.size() << " faces" << std::endl;
+    std::cout << Colors::info("Strategy 4 (small scale factor): ") << faces4.size() << " faces" << std::endl;
     
     // Strategy 5: Try with original image (no preprocessing)
     cv::Mat original_gray;
@@ -66,7 +67,7 @@ std::vector<cv::Rect> FaceDetector::detectFaces(const cv::Mat& image) {
     
     std::vector<cv::Rect> faces5;
     face_cascade.detectMultiScale(original_gray, faces5, 1.1, 3, 0, cv::Size(30, 30));
-    std::cout << "Strategy 5 (no preprocessing): " << faces5.size() << " faces" << std::endl;
+    std::cout << Colors::info("Strategy 5 (no preprocessing): ") << faces5.size() << " faces" << std::endl;
     
     // Choose the best strategy
     std::vector<cv::Rect> best_faces;
@@ -102,18 +103,18 @@ std::vector<cv::Rect> FaceDetector::detectFaces(const cv::Mat& image) {
         }
     }
     
-    std::cout << "Selected: " << best_strategy << " with " << best_faces.size() << " faces" << std::endl;
+    std::cout << Colors::success("Selected: ") << best_strategy << Colors::success(" with ") << best_faces.size() << Colors::success(" faces") << std::endl;
     
     // Apply our filtering to the best result
     if (!best_faces.empty()) {
         best_faces = filterFalsePositives(image, best_faces);
-        std::cout << "After filtering: " << best_faces.size() << " faces" << std::endl;
+        std::cout << Colors::info("After filtering: ") << best_faces.size() << " faces" << std::endl;
         
         best_faces = applyNMS(best_faces, 0.3);
-        std::cout << "After NMS: " << best_faces.size() << " faces" << std::endl;
+        std::cout << Colors::info("After NMS: ") << best_faces.size() << " faces" << std::endl;
     }
     
-    std::cout << "=== END DEBUGGING ===" << std::endl;
+    std::cout << Colors::bold("=== END DEBUGGING ===") << std::endl;
     
     return best_faces;
 }
@@ -136,9 +137,11 @@ std::vector<cv::Rect> FaceDetector::filterFalsePositives(const cv::Mat& image, c
     }
     int avg_face_area = total_area / faces.size();
     
-    std::cout << "Filtering " << faces.size() << " initial detections..." << std::endl;
-    std::cout << "Image area: " << image_area << ", Min face area: " << min_face_area 
-              << ", Max face area: " << max_face_area << ", Avg face area: " << avg_face_area << std::endl;
+    std::cout << Colors::info("Filtering ") << faces.size() << Colors::info(" initial detections...") << std::endl;
+    std::cout << Colors::info("Image area: ") << image_area 
+              << Colors::info(", Min face area: ") << min_face_area 
+              << Colors::info(", Max face area: ") << max_face_area 
+              << Colors::info(", Avg face area: ") << avg_face_area << std::endl;
     
     for (size_t i = 0; i < faces.size(); i++) {
         const auto& face = faces[i];
@@ -189,10 +192,10 @@ std::vector<cv::Rect> FaceDetector::filterFalsePositives(const cv::Mat& image, c
         
         if (keep_face) {
             filtered_faces.push_back(face);
-            std::cout << "✅ Kept face " << i << ": " << face.width << "x" << face.height 
-                      << " at (" << face.x << "," << face.y << ")" << std::endl;
+            std::cout << Colors::success("✓ Kept face ") << i << Colors::success(": ") << face.width << "x" << face.height 
+                      << Colors::success(" at (") << face.x << "," << face.y << Colors::success(")") << std::endl;
         } else {
-            std::cout << "❌ Rejected face " << i << ": " << reject_reason << std::endl;
+            std::cout << Colors::error("✗ Rejected face ") << i << Colors::error(": ") << reject_reason << std::endl;
         }
     }
     
@@ -267,9 +270,9 @@ std::vector<std::string> FaceDetector::saveFaceRegions(const cv::Mat& image, con
         
         if (cv::imwrite(face_filename, face_roi)) {
             face_files.push_back(face_filename);
-            std::cout << "Saved face " << i << " to: " << face_filename << std::endl;
+            std::cout << Colors::success("Saved face ") << i << Colors::success(" to: ") << face_filename << std::endl;
         } else {
-            std::cerr << "Error saving face " << i << " to: " << face_filename << std::endl;
+            std::cerr << Colors::error("Error saving face ") << i << Colors::error(" to: ") << face_filename << std::endl;
         }
     }
     

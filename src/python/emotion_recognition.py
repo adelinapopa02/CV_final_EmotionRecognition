@@ -13,6 +13,38 @@ from deepface import DeepFace
 import warnings
 warnings.filterwarnings('ignore')
 
+# ANSI Color Codes for terminal output
+class Colors:
+    RESET = '\033[0m'
+    RED = '\033[31m'
+    GREEN = '\033[32m'
+    YELLOW = '\033[33m'
+    BLUE = '\033[34m'
+    MAGENTA = '\033[35m'
+    CYAN = '\033[36m'
+    WHITE = '\033[37m'
+    BOLD = '\033[1m'
+    
+    @staticmethod
+    def success(text):
+        return f"{Colors.GREEN}{text}{Colors.RESET}"
+    
+    @staticmethod
+    def error(text):
+        return f"{Colors.RED}{text}{Colors.RESET}"
+    
+    @staticmethod
+    def warning(text):
+        return f"{Colors.YELLOW}{text}{Colors.RESET}"
+    
+    @staticmethod
+    def info(text):
+        return f"{Colors.CYAN}{text}{Colors.RESET}"
+    
+    @staticmethod
+    def bold(text):
+        return f"{Colors.BOLD}{text}{Colors.RESET}"
+
 class EmotionRecognizer:
     def __init__(self, model_path=None):
         """
@@ -32,8 +64,8 @@ class EmotionRecognizer:
             'neutral': 'Neutral'
         }
         
-        print("Optimized DeepFace emotion recognition initialized!")
-        print("Note: Models will be downloaded on first use")
+        print(Colors.success("Optimized DeepFace emotion recognition initialized!"))
+        print(Colors.info("Note: Models will be downloaded on first use"))
 
     def enhance_face_crop(self, face_image):
         """
@@ -62,7 +94,7 @@ class EmotionRecognizer:
                 new_height = int(height * scale)
                 new_width = int(width * scale)
                 face_image = cv2.resize(face_image, (new_width, new_height), interpolation=cv2.INTER_CUBIC)
-                print(f"  Resized from {width}x{height} to {new_width}x{new_height}")
+                print(f"  {Colors.info('Resized from')} {width}x{height} {Colors.info('to')} {new_width}x{new_height}")
             
             # Very light enhancement - just improve contrast slightly
             # Convert to float for processing
@@ -78,7 +110,7 @@ class EmotionRecognizer:
             return face_image
             
         except Exception as e:
-            print(f"Warning: Enhancement failed, using original: {e}")
+            print(Colors.warning(f"Warning: Enhancement failed, using original: {e}"))
             return face_image
 
     def predict_emotion_robust(self, face_image):
@@ -106,7 +138,7 @@ class EmotionRecognizer:
         
         for i, strategy in enumerate(strategies):
             try:
-                print(f"  Trying strategy {i+1}: enhance={strategy['enhance']}, model={strategy['model']}")
+                print(f"  {Colors.info('Trying strategy')} {i+1}: {Colors.info('enhance=')} {strategy['enhance']}, {Colors.info('model=')} {strategy['model']}")
                 
                 # Prepare image
                 if strategy['enhance']:
@@ -155,15 +187,15 @@ class EmotionRecognizer:
                     for key, value in emotion_data.items()
                 }
                 
-                print(f"  Strategy {i+1} succeeded: {predicted_emotion} ({confidence:.3f})")
+                print(f"  {Colors.success('Strategy')} {i+1} {Colors.success('succeeded:')} {predicted_emotion} ({confidence:.3f})")
                 return predicted_emotion, confidence, all_probabilities
                 
             except Exception as e:
-                print(f"  Strategy {i+1} failed: {str(e)[:50]}...")
+                print(f"  {Colors.error('Strategy')} {i+1} {Colors.error('failed:')} {str(e)[:50]}...")
                 continue
         
         # If all strategies failed
-        print("  All strategies failed, returning neutral")
+        print(Colors.warning("  All strategies failed, returning neutral"))
         return "Neutral", 0.5, {emotion: 0.0 for emotion in self.emotion_labels.values()}
 
     def predict_emotion(self, face_image):
@@ -177,11 +209,11 @@ class EmotionRecognizer:
             tuple: (predicted_emotion_string, confidence_score, all_probabilities)
         """
         try:
-            print(f"  Input image shape: {face_image.shape}")
+            print(f"  {Colors.info('Input image shape:')} {face_image.shape}")
             return self.predict_emotion_robust(face_image)
             
         except Exception as e:
-            print(f"Error in emotion prediction: {e}")
+            print(Colors.error(f"Error in emotion prediction: {e}"))
             return "Neutral", 0.5, {emotion: 0.0 for emotion in self.emotion_labels.values()}
 
     def process_face_images(self, base_filename):
@@ -197,7 +229,7 @@ class EmotionRecognizer:
         results = []
         face_index = 0
         
-        print(f"Looking for face images with base filename: {base_filename}")
+        print(f"{Colors.info('Looking for face images with base filename:')} {base_filename}")
         
         # Process each detected face image
         while True:
@@ -206,12 +238,12 @@ class EmotionRecognizer:
             if not os.path.exists(face_filename):
                 break
                 
-            print(f"Processing face image: {face_filename}")
+            print(f"{Colors.bold('Processing face image:')} {face_filename}")
             
             # Load face image
             face_image = cv2.imread(face_filename)
             if face_image is None:
-                print(f"Warning: Could not load {face_filename}")
+                print(Colors.warning(f"Warning: Could not load {face_filename}"))
                 face_index += 1
                 continue
             
@@ -228,7 +260,7 @@ class EmotionRecognizer:
             
             results.append(result)
             
-            print(f"Face {face_index}: {emotion} (confidence: {confidence:.3f})")
+            print(f"{Colors.success('Face')} {face_index}: {Colors.bold(emotion)} {Colors.success('(confidence:')} {confidence:.3f}{Colors.success(')')}")
             
             face_index += 1
         
@@ -248,25 +280,25 @@ class EmotionRecognizer:
             for result in results:
                 f.write(f"{result['predicted_emotion']}\n")
         
-        print(f"Emotions saved to: {emotions_file}")
+        print(f"{Colors.success('Emotions saved to:')} {emotions_file}")
         
         # Save detailed JSON results
         json_file = f"{base_filename}_emotion_results.json"
         with open(json_file, 'w') as f:
             json.dump(results, f, indent=2)
         
-        print(f"Detailed results saved to: {json_file}")
+        print(f"{Colors.success('Detailed results saved to:')} {json_file}")
 
 def main():
     """
     Main function for standalone emotion recognition.
     """
     if len(sys.argv) < 2:
-        print("Usage: python3 emotion_recognition.py <base_filename> [model_path]")
-        print("Example: python3 emotion_recognition.py ../output/happy_1")
-        print("\nThis script processes face images created by the face detection module.")
-        print("It looks for files like: <base_filename>_face_0.jpg, <base_filename>_face_1.jpg, etc.")
-        print("\nNote: Using optimized DeepFace with robust fallback strategies.")
+        print(Colors.bold("Usage:") + " python3 emotion_recognition.py <base_filename> [model_path]")
+        print(Colors.bold("Example:") + " python3 emotion_recognition.py ../output/happy_1")
+        print(f"\n{Colors.info('This script processes face images created by the face detection module.')}")
+        print(f"{Colors.info('It looks for files like:')} <base_filename>_face_0.jpg, <base_filename>_face_1.jpg, etc.")
+        print(f"\n{Colors.warning('Note:')} Using optimized DeepFace with robust fallback strategies.")
         return
     
     base_filename = sys.argv[1]
@@ -280,22 +312,22 @@ def main():
         results = recognizer.process_face_images(base_filename)
         
         if not results:
-            print("No face images found. Please run face detection first.")
+            print(Colors.warning("No face images found. Please run face detection first."))
             return
         
         # Save results
         recognizer.save_results(results, base_filename)
         
         # Print summary
-        print(f"\nOptimized Emotion Recognition Summary:")
-        print(f"Processed {len(results)} face(s)")
+        print(f"\n{Colors.bold('Optimized Emotion Recognition Summary:')}")
+        print(f"{Colors.success('Processed')} {len(results)} {Colors.success('face(s)')}")
         for result in results:
-            print(f"Face {result['face_index']}: {result['predicted_emotion']} "
-                  f"(confidence: {result['confidence']:.3f})")
+            print(f"{Colors.info('Face')} {result['face_index']}: {Colors.bold(result['predicted_emotion'])} "
+                  f"{Colors.info('(confidence:')} {result['confidence']:.3f}{Colors.info(')')}")
         
     except Exception as e:
-        print(f"Error during emotion recognition: {e}")
-        print("Make sure DeepFace is installed: pip install deepface")
+        print(Colors.error(f"Error during emotion recognition: {e}"))
+        print(Colors.warning("Make sure DeepFace is installed: pip install deepface"))
         return 1
 
 if __name__ == "__main__":

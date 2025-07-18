@@ -11,6 +11,38 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
 
+# ANSI Color Codes for terminal output
+class Colors:
+    RESET = '\033[0m'
+    RED = '\033[31m'
+    GREEN = '\033[32m'
+    YELLOW = '\033[33m'
+    BLUE = '\033[34m'
+    MAGENTA = '\033[35m'
+    CYAN = '\033[36m'
+    WHITE = '\033[37m'
+    BOLD = '\033[1m'
+    
+    @staticmethod
+    def success(text):
+        return f"{Colors.GREEN}{text}{Colors.RESET}"
+    
+    @staticmethod
+    def error(text):
+        return f"{Colors.RED}{text}{Colors.RESET}"
+    
+    @staticmethod
+    def warning(text):
+        return f"{Colors.YELLOW}{text}{Colors.RESET}"
+    
+    @staticmethod
+    def info(text):
+        return f"{Colors.CYAN}{text}{Colors.RESET}"
+    
+    @staticmethod
+    def bold(text):
+        return f"{Colors.BOLD}{text}{Colors.RESET}"
+
 class SystemEvaluator:
     def __init__(self):
         """Initialize the system evaluator."""
@@ -81,7 +113,7 @@ class SystemEvaluator:
                         emotions.append(self.class_to_emotion.get(int(emotion_class), 'Neutral'))
                         
         except Exception as e:
-            print(f"Error parsing {file_path}: {e}")
+            print(Colors.error(f"Error parsing {file_path}: {e}"))
             
         return boxes, emotions
     
@@ -134,10 +166,10 @@ class SystemEvaluator:
                 result_files.append(file)
         
         if not result_files:
-            print("Error: No unified results files found in results directory")
+            print(Colors.error("Error: No unified results files found in results directory"))
             return None, None
         
-        print(f"Found {len(result_files)} result files to evaluate")
+        print(f"{Colors.success('Found')} {len(result_files)} {Colors.success('result files to evaluate')}")
         
         # Initialize metrics
         all_matches = []
@@ -168,7 +200,7 @@ class SystemEvaluator:
                     break
             
             if not label_file:
-                print(f"Warning: No label file found for {base_name}")
+                print(Colors.warning(f"Warning: No label file found for {base_name}"))
                 continue
             
             # Parse files
@@ -179,7 +211,7 @@ class SystemEvaluator:
             if not pred_boxes and not gt_boxes:
                 continue
             
-            print(f"Processing {base_name}: {len(pred_boxes)} predicted, {len(gt_boxes)} ground truth")
+            print(f"{Colors.info('Processing')} {base_name}: {len(pred_boxes)} {Colors.info('predicted,')} {len(gt_boxes)} {Colors.info('ground truth')}")
             
             # Match faces
             matches, unmatched_pred, unmatched_gt = self.match_faces(
@@ -200,7 +232,7 @@ class SystemEvaluator:
             processed_files += 1
         
         if processed_files == 0:
-            print("Error: No files could be processed")
+            print(Colors.error("Error: No files could be processed"))
             return None, None
         
         # Calculate face detection metrics
@@ -243,7 +275,7 @@ class SystemEvaluator:
                 'true_emotions': all_gt_emotions
             }
         
-        print(f"\nProcessed {processed_files} files successfully")
+        print(f"\n{Colors.success('Processed')} {processed_files} {Colors.success('files successfully')}")
         return face_metrics, emotion_metrics
     
     def plot_confusion_matrix(self, cm, output_file='confusion_matrix.png'):
@@ -258,7 +290,7 @@ class SystemEvaluator:
         plt.tight_layout()
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
-        print(f"Confusion matrix saved to: {output_file}")
+        print(f"{Colors.success('Confusion matrix saved to:')} {output_file}")
     
     def generate_report(self, face_metrics, emotion_metrics, output_file='evaluation_report.txt'):
         """Generate comprehensive evaluation report."""
@@ -297,34 +329,34 @@ class SystemEvaluator:
                 f.write(f"  Recall: {macro['recall']:.3f}\n")
                 f.write(f"  F1-Score: {macro['f1-score']:.3f}\n")
         
-        print(f"Evaluation report saved to: {output_file}")
+        print(f"{Colors.success('Evaluation report saved to:')} {output_file}")
 
 def main():
     """Main function for system evaluation."""
     if len(sys.argv) < 3:
-        print("Usage: python3 evaluation.py <results_directory> <labels_directory>")
-        print("Example: python3 evaluation.py ./output ./data/labels")
+        print(Colors.bold("Usage:") + " python3 evaluation.py <results_directory> <labels_directory>")
+        print(Colors.bold("Example:") + " python3 evaluation.py ./output ./data/labels")
         return
     
     results_dir = sys.argv[1]
     labels_dir = sys.argv[2]
     
     if not os.path.exists(results_dir):
-        print(f"Error: Results directory not found: {results_dir}")
+        print(Colors.error(f"Error: Results directory not found: {results_dir}"))
         return
     
     if not os.path.exists(labels_dir):
-        print(f"Error: Labels directory not found: {labels_dir}")
+        print(Colors.error(f"Error: Labels directory not found: {labels_dir}"))
         return
     
     try:
         evaluator = SystemEvaluator()
         
-        print("Evaluating system by comparing unified results with ground truth labels...")
+        print(Colors.info("Evaluating system by comparing unified results with ground truth labels..."))
         face_metrics, emotion_metrics = evaluator.evaluate_system(results_dir, labels_dir)
         
         if face_metrics is None or emotion_metrics is None:
-            print("Evaluation failed!")
+            print(Colors.error("Evaluation failed!"))
             return
         
         # Plot confusion matrix
@@ -334,18 +366,25 @@ def main():
         # Generate report
         evaluator.generate_report(face_metrics, emotion_metrics)
         
-        # Print summary
+        # Print summary with colors
         print("\n" + "="*60)
-        print("EVALUATION SUMMARY")
+        print(Colors.bold("EVALUATION SUMMARY"))
         print("="*60)
-        print(f"Face Detection F1-Score: {face_metrics['f1_score']:.3f}")
-        print(f"Face Detection Average IoU: {face_metrics['average_iou']:.3f}")
-        print(f"Emotion Recognition Accuracy: {emotion_metrics['accuracy']:.3f}")
-        print(f"Total Faces Evaluated: {len(emotion_metrics.get('predicted_emotions', []))}")
+        
+        # Format metrics with proper color separation
+        f1_score = f"{face_metrics['f1_score']:.3f}"
+        avg_iou = f"{face_metrics['average_iou']:.3f}"
+        accuracy = f"{emotion_metrics['accuracy']:.3f}"
+        total_faces = str(len(emotion_metrics.get('predicted_emotions', [])))
+        
+        print(f"{Colors.info('Face Detection F1-Score:')} {Colors.bold(f1_score)}")
+        print(f"{Colors.info('Face Detection Average IoU:')} {Colors.bold(avg_iou)}")
+        print(f"{Colors.info('Emotion Recognition Accuracy:')} {Colors.bold(accuracy)}")
+        print(f"{Colors.info('Total Faces Evaluated:')} {Colors.bold(total_faces)}")
         print("="*60)
         
     except Exception as e:
-        print(f"Error during evaluation: {e}")
+        print(Colors.error(f"Error during evaluation: {e}"))
         import traceback
         traceback.print_exc()
 

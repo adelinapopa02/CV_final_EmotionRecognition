@@ -1,4 +1,5 @@
 #include "Integration.h"
+#include "Colors.h"
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -13,11 +14,11 @@ Integration::Integration(
     
     // Check if Python script exists (only needed for complete integration)
     if (!std::filesystem::exists(python_script_path)) {
-        std::cerr << "Warning: Python script not found: " << python_script_path << std::endl;
-        std::cerr << "Complete integration mode will not be available." << std::endl;
+        std::cerr << Colors::warning("Warning: Python script not found: ") << python_script_path << std::endl;
+        std::cerr << Colors::warning("Complete integration mode will not be available.") << std::endl;
     }
     
-    std::cout << "System Integrator initialized!" << std::endl;
+    std::cout << Colors::success("System Integrator initialized!") << std::endl;
 }
 
 bool Integration::runFaceDetectionOnly(const std::string& image_path) {
@@ -25,13 +26,13 @@ bool Integration::runFaceDetectionOnly(const std::string& image_path) {
         // Load input image
         cv::Mat image = cv::imread(image_path);
         if (image.empty()) {
-            std::cerr << "Error: Could not load image from " << image_path << std::endl;
+            std::cerr << Colors::error("Error: Could not load image from ") << image_path << std::endl;
             return false;
         }
 
-        std::cout << "\n=== FACE DETECTION MODE ===" << std::endl;
-        std::cout << "Input image: " << image_path << std::endl;
-        std::cout << "Image size: " << image.cols << "x" << image.rows << std::endl;
+        std::cout << "\n" << Colors::bold("=== FACE DETECTION MODE ===") << std::endl;
+        std::cout << Colors::info("Input image: ") << image_path << std::endl;
+        std::cout << Colors::info("Image size: ") << image.cols << "x" << image.rows << std::endl;
 
         // Detect faces
         std::vector<cv::Rect> faces = face_detector.detectFaces(image);
@@ -40,8 +41,8 @@ bool Integration::runFaceDetectionOnly(const std::string& image_path) {
         std::string base_filename = getBaseFilename(image_path);
 
         if (faces.empty()) {
-            std::cout << "No faces detected in the image." << std::endl;
-            std::cout << "Creating empty results file." << std::endl;
+            std::cout << Colors::warning("No faces detected in the image.") << std::endl;
+            std::cout << Colors::info("Creating empty results file.") << std::endl;
             
             // Create empty unified results file
             std::vector<std::string> empty_emotions;
@@ -50,14 +51,14 @@ bool Integration::runFaceDetectionOnly(const std::string& image_path) {
             // Create empty detection result image (just the original image)
             std::string output_image = base_filename + "_faces_detected.jpg";
             if (!cv::imwrite(output_image, image)) {
-                std::cerr << "Error: Could not save result image to " << output_image << std::endl;
+                std::cerr << Colors::error("Error: Could not save result image to ") << output_image << std::endl;
                 return false;
             }
-            std::cout << "Result saved to: " << output_image << std::endl;
+            std::cout << Colors::success("Result saved to: ") << output_image << std::endl;
             
-            std::cout << "\n=== FACE DETECTION SUMMARY ===" << std::endl;
-            std::cout << "Total faces detected: 0" << std::endl;
-            std::cout << "Face detection completed successfully!" << std::endl;
+            std::cout << "\n" << Colors::bold("=== FACE DETECTION SUMMARY ===") << std::endl;
+            std::cout << Colors::info("Total faces detected: ") << "0" << std::endl;
+            std::cout << Colors::success("Face detection completed successfully!") << std::endl;
             
             return true;
         }
@@ -70,23 +71,23 @@ bool Integration::runFaceDetectionOnly(const std::string& image_path) {
         std::string output_image = base_filename + "_faces_detected.jpg";
         cv::Mat result_image = face_detector.drawFaceBoxes(image, faces);
         if (!cv::imwrite(output_image, result_image)) {
-            std::cerr << "Error: Could not save result image to " << output_image << std::endl;
+            std::cerr << Colors::error("Error: Could not save result image to ") << output_image << std::endl;
             return false;
         }
-        std::cout << "Result saved to: " << output_image << std::endl;
+        std::cout << Colors::success("Result saved to: ") << output_image << std::endl;
 
         // Save individual face regions
         std::vector<std::string> face_files = face_detector.saveFaceRegions(image, faces, base_filename);
 
-        std::cout << "\n=== FACE DETECTION SUMMARY ===" << std::endl;
-        std::cout << "Total faces detected: " << faces.size() << std::endl;
-        std::cout << "Face region files created: " << face_files.size() << std::endl;
-        std::cout << "Face detection completed successfully!" << std::endl;
+        std::cout << "\n" << Colors::bold("=== FACE DETECTION SUMMARY ===") << std::endl;
+        std::cout << Colors::success("Total faces detected: ") << faces.size() << std::endl;
+        std::cout << Colors::success("Face region files created: ") << face_files.size() << std::endl;
+        std::cout << Colors::success("Face detection completed successfully!") << std::endl;
 
         return true;
 
     } catch (const std::exception& e) {
-        std::cerr << "Error in face detection: " << e.what() << std::endl;
+        std::cerr << Colors::error("Error in face detection: ") << e.what() << std::endl;
         return false;
     }
 }
@@ -96,23 +97,23 @@ bool Integration::runCompleteIntegration(const std::string& image_path) {
         // Load input image
         cv::Mat image = cv::imread(image_path);
         if (image.empty()) {
-            std::cerr << "Error: Could not load image from " << image_path << std::endl;
+            std::cerr << Colors::error("Error: Could not load image from ") << image_path << std::endl;
             return false;
         }
 
-        std::cout << "\n=== COMPLETE INTEGRATION MODE ===" << std::endl;
-        std::cout << "Input image: " << image_path << std::endl;
-        std::cout << "Image size: " << image.cols << "x" << image.rows << std::endl;
+        std::cout << "\n" << Colors::bold("=== COMPLETE INTEGRATION MODE ===") << std::endl;
+        std::cout << Colors::info("Input image: ") << image_path << std::endl;
+        std::cout << Colors::info("Image size: ") << image.cols << "x" << image.rows << std::endl;
 
         // Step 1: Face Detection
-        std::cout << "\nStep 1: Face Detection" << std::endl;
+        std::cout << "\n" << Colors::bold("Step 1: Face Detection") << std::endl;
         std::vector<cv::Rect> faces = face_detector.detectFaces(image);
 
         // Generate output filenames
         std::string base_filename = getBaseFilename(image_path);
 
         if (faces.empty()) {
-            std::cout << "No faces detected. Creating empty results file." << std::endl;
+            std::cout << Colors::warning("No faces detected. Creating empty results file.") << std::endl;
             
             // Create empty unified results file
             std::vector<std::string> empty_emotions;
@@ -121,66 +122,66 @@ bool Integration::runCompleteIntegration(const std::string& image_path) {
             // Create final result image (just the original image)
             std::string final_output = base_filename + "_final_result.jpg";
             if (!cv::imwrite(final_output, image)) {
-                std::cerr << "Error: Could not save final result to " << final_output << std::endl;
+                std::cerr << Colors::error("Error: Could not save final result to ") << final_output << std::endl;
                 return false;
             }
-            std::cout << "Final result saved to: " << final_output << std::endl;
+            std::cout << Colors::success("Final result saved to: ") << final_output << std::endl;
             
-            std::cout << "\n=== INTEGRATION SUMMARY ===" << std::endl;
-            std::cout << "Total faces detected: 0" << std::endl;
-            std::cout << "Emotions recognized: 0" << std::endl;
-            std::cout << "\nOutput files created:" << std::endl;
+            std::cout << "\n" << Colors::bold("=== INTEGRATION SUMMARY ===") << std::endl;
+            std::cout << Colors::info("Total faces detected: ") << "0" << std::endl;
+            std::cout << Colors::info("Emotions recognized: ") << "0" << std::endl;
+            std::cout << "\n" << Colors::info("Output files created:") << std::endl;
             std::cout << "- " << final_output << " (final result)" << std::endl;
             std::cout << "- " << base_filename + "_unified_results.txt (empty results)" << std::endl;
-            std::cout << "Complete integration completed successfully!" << std::endl;
+            std::cout << Colors::success("Complete integration completed successfully!") << std::endl;
             
             return true;
         }
 
         // Step 2: Save face regions
-        std::cout << "\nStep 2: Extracting Face Regions" << std::endl;
+        std::cout << "\n" << Colors::bold("Step 2: Extracting Face Regions") << std::endl;
         std::vector<std::string> face_files = face_detector.saveFaceRegions(image, faces, base_filename);
 
         // Step 3: Emotion Recognition
-        std::cout << "\nStep 3: Emotion Recognition" << std::endl;
+        std::cout << "\n" << Colors::bold("Step 3: Emotion Recognition") << std::endl;
         std::vector<std::string> emotions = runEmotionRecognition(base_filename);
 
         // Step 4: Save unified results (emotion + coordinates)
-        std::cout << "\nStep 4: Saving Unified Results" << std::endl;
+        std::cout << "\n" << Colors::bold("Step 4: Saving Unified Results") << std::endl;
         saveUnifiedResults(image, faces, emotions, base_filename);
 
         // Step 5: Create final result
-        std::cout << "\nStep 5: Creating Final Result" << std::endl;
+        std::cout << "\n" << Colors::bold("Step 5: Creating Final Result") << std::endl;
         cv::Mat final_result = createFinalResult(image, faces, emotions);
         
         std::string final_output = base_filename + "_final_result.jpg";
         if (!cv::imwrite(final_output, final_result)) {
-            std::cerr << "Error: Could not save final result to " << final_output << std::endl;
+            std::cerr << Colors::error("Error: Could not save final result to ") << final_output << std::endl;
             return false;
         }
-        std::cout << "Final result saved to: " << final_output << std::endl;
+        std::cout << Colors::success("Final result saved to: ") << final_output << std::endl;
 
         // Step 6: Clean up remaining temporary files
-        std::cout << "\nStep 6: Cleaning up temporary files" << std::endl;
+        std::cout << "\n" << Colors::bold("Step 6: Cleaning up temporary files") << std::endl;
         
         // Delete emotion_results.json file (emotions.txt is already deleted)
         std::string json_file = base_filename + "_emotion_results.json";
         
         if (std::filesystem::exists(json_file)) {
             std::filesystem::remove(json_file);
-            std::cout << "Deleted temporary file: " << json_file << std::endl;
+            std::cout << Colors::info("Deleted temporary file: ") << json_file << std::endl;
         }
         
         // Step 7: Print summary
-        std::cout << "\n=== INTEGRATION SUMMARY ===" << std::endl;
-        std::cout << "Total faces detected: " << faces.size() << std::endl;
-        std::cout << "Emotions recognized: " << emotions.size() << std::endl;
+        std::cout << "\n" << Colors::bold("=== INTEGRATION SUMMARY ===") << std::endl;
+        std::cout << Colors::success("Total faces detected: ") << faces.size() << std::endl;
+        std::cout << Colors::success("Emotions recognized: ") << emotions.size() << std::endl;
         
         for (size_t i = 0; i < std::min(faces.size(), emotions.size()); i++) {
-            std::cout << "Face " << i << ": " << emotions[i] << std::endl;
+            std::cout << Colors::info("Face ") << i << Colors::info(": ") << emotions[i] << std::endl;
         }
         
-        std::cout << "\nOutput files created:" << std::endl;
+        std::cout << "\n" << Colors::info("Output files created:") << std::endl;
         std::cout << "- " << final_output << " (final result with annotations)" << std::endl;
         std::cout << "- " << base_filename + "_unified_results.txt (unified emotion + coordinates)" << std::endl;
         
@@ -188,11 +189,11 @@ bool Integration::runCompleteIntegration(const std::string& image_path) {
             std::cout << "- " << face_file << " (extracted face region)" << std::endl;
         }
 
-        std::cout << "Complete integration completed successfully!" << std::endl;
+        std::cout << Colors::success("Complete integration completed successfully!") << std::endl;
         return true;
 
     } catch (const std::exception& e) {
-        std::cerr << "Error in complete integration: " << e.what() << std::endl;
+        std::cerr << Colors::error("Error in complete integration: ") << e.what() << std::endl;
         return false;
     }
 }
@@ -208,14 +209,14 @@ std::vector<std::string> Integration::runEmotionRecognition(const std::string& b
         + quote(base_filename)                       
         + (model_path.empty() ? "" : " " + quote(model_path));
     
-    std::cout << "Running emotion recognition..." << std::endl;
-    std::cout << "Command: " << python_command << std::endl;
+    std::cout << Colors::info("Running emotion recognition...") << std::endl;
+    std::cout << Colors::info("Command: ") << python_command << std::endl;
     
     // Execute Python script
     int result = std::system(python_command.c_str());
     
     if (result != 0) {
-        std::cerr << "Warning: Emotion recognition script returned non-zero exit code: " 
+        std::cerr << Colors::warning("Warning: Emotion recognition script returned non-zero exit code: ") 
                   << result << std::endl;
     }
     
@@ -231,12 +232,12 @@ std::vector<std::string> Integration::runEmotionRecognition(const std::string& b
             }
         }
         file.close();
-        std::cout << "Successfully read " << emotions.size() << " emotion predictions" << std::endl;
+        std::cout << Colors::success("Successfully read ") << emotions.size() << Colors::success(" emotion predictions") << std::endl;
         
         // Delete the temporary emotions file immediately after reading
         std::filesystem::remove(emotions_file);
     } else {
-        std::cerr << "Warning: Could not read emotions file: " << emotions_file << std::endl;
+        std::cerr << Colors::warning("Warning: Could not read emotions file: ") << emotions_file << std::endl;
     }
     
     return emotions;
@@ -261,7 +262,7 @@ void Integration::saveUnifiedResults(const cv::Mat& image, const std::vector<cv:
         // If no faces detected, create empty file
         if (faces.empty()) {
             file.close();
-            std::cout << "Empty unified results saved to: " << unified_file << std::endl;
+            std::cout << Colors::info("Empty unified results saved to: ") << unified_file << std::endl;
             return;
         }
         
@@ -287,9 +288,9 @@ void Integration::saveUnifiedResults(const cv::Mat& image, const std::vector<cv:
             file << emotion_class << " " << center_x << " " << center_y << " " << width << " " << height << std::endl;
         }
         file.close();
-        std::cout << "Unified results saved to: " << unified_file << std::endl;
+        std::cout << Colors::success("Unified results saved to: ") << unified_file << std::endl;
     } else {
-        std::cerr << "Error: Could not create unified results file: " << unified_file << std::endl;
+        std::cerr << Colors::error("Error: Could not create unified results file: ") << unified_file << std::endl;
     }
 }
 

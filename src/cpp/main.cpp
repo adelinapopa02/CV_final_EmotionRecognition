@@ -1,5 +1,6 @@
 #include "FaceDetector.h"
 #include "Integration.h"
+#include "Colors.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -10,47 +11,64 @@
 #include <thread>
 
 void printUsage(const char* program_name) {
-    std::cout << "Face Detection and Emotion Recognition System" << std::endl;
-    std::cout << "=============================================" << std::endl;
+    std::cout << Colors::bold("Face Detection and Emotion Recognition System") << std::endl;
+    std::cout << Colors::bold("=============================================") << std::endl;
     std::cout << std::endl;
-    std::cout << "Usage:" << std::endl;
+    std::cout << Colors::info("DESCRIPTION:") << std::endl;
+    std::cout << "  A computer vision system that detects faces using Viola-Jones algorithm" << std::endl;
+    std::cout << "  and recognizes emotions using DeepFace deep learning models." << std::endl;
+    std::cout << std::endl;
+    std::cout << Colors::info("USAGE:") << std::endl;
     std::cout << "  " << program_name << " <mode> <input> [options...]" << std::endl;
     std::cout << std::endl;
-    std::cout << "Modes:" << std::endl;
-    std::cout << "  --detect-only     Run face detection only" << std::endl;
-    std::cout << "  --integrate       Run complete pipeline (face detection + emotion recognition)" << std::endl;
-    std::cout << "  --batch-detect    Run face detection only on all images in directory" << std::endl;
-    std::cout << "  --batch-integrate Run complete pipeline on all images in directory" << std::endl;
+    std::cout << Colors::info("MODES:") << std::endl;
+    std::cout << "  " << Colors::bold("--detect-only") << "     Face detection only (no emotion recognition)" << std::endl;
+    std::cout << "  " << Colors::bold("--integrate") << "       Complete pipeline (face detection + emotion recognition)" << std::endl;
+    std::cout << "  " << Colors::bold("--batch-detect") << "    Face detection on all images in directory" << std::endl;
+    std::cout << "  " << Colors::bold("--batch-integrate") << " Complete pipeline on all images in directory" << std::endl;
     std::cout << std::endl;
-    std::cout << "Input:" << std::endl;
+    std::cout << Colors::info("INPUT:") << std::endl;
     std::cout << "  <input>           Path to image file (for single image modes)" << std::endl;
     std::cout << "                    Path to directory (for batch modes)" << std::endl;
     std::cout << std::endl;
-    std::cout << "Options:" << std::endl;
-    std::cout << "  --cascade <path>  Path to Haar cascade file" << std::endl;
-    std::cout << "  --script <path>   Path to emotion recognition Python script" << std::endl;
-    std::cout << "  --model <path>    Path to emotion recognition model (optional with DeepFace)" << std::endl;
-    std::cout << "  --extensions <ext1,ext2,...>  Image extensions to process (default: jpg,jpeg,png,bmp)" << std::endl;
+    std::cout << Colors::info("OPTIONS:") << std::endl;
+    std::cout << "  " << Colors::bold("--cascade") << " <path>  Path to Haar cascade file" << std::endl;
+    std::cout << "                    (default: ../models/haarcascade_frontalface_alt.xml)" << std::endl;
+    std::cout << "  " << Colors::bold("--script") << " <path>   Path to emotion recognition Python script" << std::endl;
+    std::cout << "                    (default: ../src/python/emotion_recognition.py)" << std::endl;
+    std::cout << "  " << Colors::bold("--extensions") << " <ext1,ext2,...>  Image extensions for batch processing" << std::endl;
+    std::cout << "                    (default: jpg,jpeg,png,bmp)" << std::endl;
     std::cout << std::endl;
-    std::cout << "Examples:" << std::endl;
+    std::cout << Colors::info("EXAMPLES:") << std::endl;
     std::cout << "  # Single image processing" << std::endl;
     std::cout << "  " << program_name << " --detect-only ../data/images/happy_1.jpg" << std::endl;
     std::cout << "  " << program_name << " --integrate ../data/images/happy_1.jpg" << std::endl;
     std::cout << std::endl;
-    std::cout << "  # Batch processing - all images in directory" << std::endl;
+    std::cout << "  # Batch processing" << std::endl;
     std::cout << "  " << program_name << " --batch-integrate ../data/images/" << std::endl;
     std::cout << "  " << program_name << " --batch-detect ../data/images/" << std::endl;
     std::cout << std::endl;
-    std::cout << "  # Batch processing with custom extensions" << std::endl;
-    std::cout << "  " << program_name << " --batch-integrate ../data/images/ --extensions jpg,png" << std::endl;
-    std::cout << std::endl;
-    std::cout << "  # Custom paths for batch processing" << std::endl;
+    std::cout << "  # Custom parameters" << std::endl;
     std::cout << "  " << program_name << " --batch-integrate ../data/images/ \\" << std::endl;
-    std::cout << "    --cascade ../models/haarcascade_frontalface_alt.xml \\" << std::endl;
-    std::cout << "    --script ../src/python/emotion_recognition.py" << std::endl;
+    std::cout << "    --cascade ../models/haarcascade_frontalface_default.xml \\" << std::endl;
+    std::cout << "    --extensions jpg,png" << std::endl;
     std::cout << std::endl;
-    std::cout << "Note: This version uses DeepFace for emotion recognition." << std::endl;
-    std::cout << "      Models will be downloaded automatically on first use." << std::endl;
+    std::cout << Colors::info("OUTPUT FILES:") << std::endl;
+    std::cout << "  Results are saved to ../output/ directory:" << std::endl;
+    std::cout << "  - [name]_faces_detected.jpg     Face detection visualization" << std::endl;
+    std::cout << "  - [name]_final_result.jpg       Complete pipeline result (with emotions)" << std::endl;
+    std::cout << "  - [name]_face_N.jpg             Individual face regions" << std::endl;
+    std::cout << "  - [name]_unified_results.txt    Face coordinates and emotions (YOLO format)" << std::endl;
+    std::cout << std::endl;
+    std::cout << Colors::info("EVALUATION:") << std::endl;
+    std::cout << "  To evaluate system performance against ground truth labels:" << std::endl;
+    std::cout << "  " << Colors::bold("python3 ../src/python/evaluation.py ../output ../data/labels") << std::endl;
+    std::cout << std::endl;
+    std::cout << Colors::info("SYSTEM INFO:") << std::endl;
+    std::cout << "  Face Detection: Viola-Jones algorithm (OpenCV Haar Cascades)" << std::endl;
+    std::cout << "  Emotion Recognition: DeepFace with multiple CNN models" << std::endl;
+    std::cout << "  Supported Emotions: Angry, Disgust, Fear, Happy, Sad, Surprise, Neutral" << std::endl;
+    std::cout << "  Image Formats: JPEG, PNG, BMP" << std::endl;
 }
 
 struct ProgramOptions {
@@ -59,7 +77,6 @@ struct ProgramOptions {
     std::string cascade_path = "../models/haarcascade_frontalface_alt.xml";
     std::string script_path = "../src/python/emotion_recognition.py";
     std::string model_path = "";  // Empty for DeepFace (not needed)
-    std::string output_dir = "./output";
     std::vector<std::string> extensions = {"jpg", "jpeg", "png", "bmp"};
     bool valid = false;
     bool is_batch = false;
@@ -130,15 +147,15 @@ ProgramOptions parseArguments(int argc, char* argv[]) {
     } else if (options.mode == "--batch-detect" || options.mode == "--batch-integrate") {
         options.is_batch = true;
     } else {
-        std::cerr << "Error: Invalid mode '" << options.mode << "'" << std::endl;
-        std::cerr << "Valid modes are: --detect-only, --integrate, --batch-detect, --batch-integrate" << std::endl;
+        std::cerr << Colors::error("Error: Invalid mode '") << options.mode << Colors::error("'") << std::endl;
+        std::cerr << Colors::warning("Valid modes: --detect-only, --integrate, --batch-detect, --batch-integrate") << std::endl;
         return options;
     }
     
     // Parse optional arguments
     for (int i = 3; i < argc; i += 2) {
         if (i + 1 >= argc) {
-            std::cerr << "Error: Option '" << argv[i] << "' requires a value" << std::endl;
+            std::cerr << Colors::error("Error: Option '") << argv[i] << Colors::error("' requires a value") << std::endl;
             return options;
         }
         
@@ -149,14 +166,11 @@ ProgramOptions parseArguments(int argc, char* argv[]) {
             options.cascade_path = value;
         } else if (option == "--script") {
             options.script_path = value;
-        } else if (option == "--model") {
-            options.model_path = value;  // Optional for DeepFace
-        } else if (option == "--output") {
-            options.output_dir = value;
         } else if (option == "--extensions") {
             options.extensions = split(value, ',');
         } else {
-            std::cerr << "Error: Unknown option '" << option << "'" << std::endl;
+            std::cerr << Colors::error("Error: Unknown option '") << option << Colors::error("'") << std::endl;
+            std::cerr << Colors::warning("Valid options: --cascade, --script, --extensions") << std::endl;
             return options;
         }
     }
@@ -165,13 +179,38 @@ ProgramOptions parseArguments(int argc, char* argv[]) {
     return options;
 }
 
+void printSystemInfo(const ProgramOptions& options) {
+    std::cout << Colors::bold("Face Detection and Emotion Recognition System") << std::endl;
+    std::cout << Colors::bold("=============================================") << std::endl;
+    std::cout << Colors::info("Mode: ") << options.mode << std::endl;
+    std::cout << Colors::info("Input: ") << options.input_path << std::endl;
+    std::cout << Colors::info("Cascade: ") << options.cascade_path << std::endl;
+    
+    if (options.mode == "--integrate" || options.mode == "--batch-integrate") {
+        std::cout << Colors::info("Python Script: ") << options.script_path << std::endl;
+        std::cout << Colors::info("Emotion Models: ") << "DeepFace (auto-download)" << std::endl;
+    }
+    
+    if (options.is_batch) {
+        std::cout << Colors::info("Image Extensions: ");
+        for (size_t i = 0; i < options.extensions.size(); ++i) {
+            std::cout << options.extensions[i];
+            if (i < options.extensions.size() - 1) std::cout << ", ";
+        }
+        std::cout << std::endl;
+    }
+    
+    std::cout << Colors::info("Output Directory: ") << "../output/" << std::endl;
+    std::cout << std::endl;
+}
+
 bool processSingleImage(Integration& integrator, const std::string& image_path, const std::string& mode, int current = 0, int total = 0) {
     if (total > 1) {
-        std::cout << "\n" << std::string(60, '=') << std::endl;
+        std::cout << std::string(60, '=') << std::endl;
         std::cout << "[" << current << "/" << total << "] Processing: " << std::filesystem::path(image_path).filename().string() << std::endl;
         std::cout << std::string(60, '=') << std::endl;
     } else {
-        std::cout << "\n" << std::string(60, '=') << std::endl;
+        std::cout << std::string(60, '=') << std::endl;
         std::cout << "Processing: " << std::filesystem::path(image_path).filename().string() << std::endl;
         std::cout << std::string(60, '=') << std::endl;
     }
@@ -185,12 +224,47 @@ bool processSingleImage(Integration& integrator, const std::string& image_path, 
     }
     
     if (success) {
-        std::cout << "✅ Successfully processed: " << std::filesystem::path(image_path).filename().string() << std::endl;
+        std::cout << Colors::success("[SUCCESS] ") << "Successfully processed: " << std::filesystem::path(image_path).filename().string() << std::endl;
     } else {
-        std::cout << "❌ Failed to process: " << std::filesystem::path(image_path).filename().string() << std::endl;
+        std::cout << Colors::error("[FAILED] ") << "Failed to process: " << std::filesystem::path(image_path).filename().string() << std::endl;
     }
     
     return success;
+}
+
+void printFinalSummary(int successful_count, int failed_count, int total_count, 
+                      std::chrono::seconds duration, const std::string& mode) {
+    std::cout << "\n" << std::string(60, '=') << std::endl;
+    std::cout << Colors::bold("PROCESSING SUMMARY") << std::endl;
+    std::cout << std::string(60, '=') << std::endl;
+    std::cout << Colors::info("Total images processed: ") << total_count << std::endl;
+    std::cout << Colors::success("Successful: ") << successful_count << std::endl;
+    std::cout << Colors::error("Failed: ") << failed_count << std::endl;
+    std::cout << Colors::info("Success rate: ") << (successful_count * 100.0 / total_count) << "%" << std::endl;
+    std::cout << Colors::info("Total processing time: ") << duration.count() << " seconds" << std::endl;
+    if (total_count > 0) {
+        std::cout << Colors::info("Average time per image: ") << (duration.count() / static_cast<double>(total_count)) << " seconds" << std::endl;
+    }
+    
+    if (failed_count > 0) {
+        std::cout << "\n" << Colors::warning("[WARNING] ") << "Some images failed to process. Check error messages above." << std::endl;
+    }
+    
+    if (successful_count > 0) {
+        std::cout << "\n" << Colors::success("[COMPLETED] ") << "Processing completed successfully!" << std::endl;
+        std::cout << Colors::info("Results saved to: ") << "../output/" << std::endl;
+        
+        std::cout << "\n" << Colors::bold("NEXT STEPS:") << std::endl;
+        if (mode == "--batch-integrate" || mode == "--batch-detect") {
+            std::cout << Colors::info("• Evaluate system performance:") << std::endl;
+            std::cout << "  " << Colors::bold("python3 ../src/python/evaluation.py ../output ../data/labels") << std::endl;
+            std::cout << Colors::info("• View individual results in ../output/ directory") << std::endl;
+        } else {
+            std::cout << Colors::info("• Check results in ../output/ directory") << std::endl;
+            std::cout << Colors::info("• Run batch processing on full dataset:") << std::endl;
+            std::cout << "  " << Colors::bold("./face_emotion_system --batch-integrate ../data/images/") << std::endl;
+        }
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -203,31 +277,28 @@ int main(int argc, char* argv[]) {
             return -1;
         }
         
-        std::cout << "Face Detection and Emotion Recognition System (DeepFace)" << std::endl;
-        std::cout << "=======================================================" << std::endl;
-        std::cout << "Mode: " << options.mode << std::endl;
-        std::cout << "Input: " << options.input_path << std::endl;
-        std::cout << "Cascade: " << options.cascade_path << std::endl;
+        // Print system information
+        printSystemInfo(options);
         
-        if (options.mode == "--integrate" || options.mode == "--batch-integrate") {
-            std::cout << "Script: " << options.script_path << std::endl;
-            std::cout << "Emotion Recognition: DeepFace (models downloaded automatically)" << std::endl;
+        // Validate input paths
+        if (!options.is_batch) {
+            if (!std::filesystem::exists(options.input_path)) {
+                std::cerr << "Error: Input file does not exist: " << options.input_path << std::endl;
+                return -1;
+            }
         }
         
-        if (options.is_batch) {
-            std::cout << "Extensions: ";
-            for (size_t i = 0; i < options.extensions.size(); ++i) {
-                std::cout << options.extensions[i];
-                if (i < options.extensions.size() - 1) std::cout << ", ";
-            }
-            std::cout << std::endl;
+        if (!std::filesystem::exists(options.cascade_path)) {
+            std::cerr << Colors::error("Error: Cascade file does not exist: ") << options.cascade_path << std::endl;
+            std::cerr << Colors::warning("Please ensure the Haar cascade file is available.") << std::endl;
+            return -1;
         }
         
         // Initialize system integrator
         Integration integrator(
             options.cascade_path,
             options.script_path,
-            options.model_path  // Empty for DeepFace
+            options.model_path
         );
         
         std::vector<std::string> image_files;
@@ -237,8 +308,8 @@ int main(int argc, char* argv[]) {
             image_files = findImageFiles(options.input_path, options.extensions);
             
             if (image_files.empty()) {
-                std::cerr << "No image files found in directory: " << options.input_path << std::endl;
-                std::cerr << "Looking for extensions: ";
+                std::cerr << Colors::error("Error: No image files found in directory: ") << options.input_path << std::endl;
+                std::cerr << Colors::info("Looking for extensions: ");
                 for (size_t i = 0; i < options.extensions.size(); ++i) {
                     std::cerr << options.extensions[i];
                     if (i < options.extensions.size() - 1) std::cerr << ", ";
@@ -247,17 +318,11 @@ int main(int argc, char* argv[]) {
                 return -1;
             }
             
-            std::cout << "\nFound " << image_files.size() << " image file(s) to process" << std::endl;
-            
-            // Show list of files to be processed
-            std::cout << "\nFiles to process:" << std::endl;
-            for (const auto& file : image_files) {
-                std::cout << "  - " << std::filesystem::path(file).filename().string() << std::endl;
-            }
+            std::cout << Colors::success("Found ") << image_files.size() << Colors::success(" image file(s) to process") << std::endl;
             
             if (options.mode == "--batch-integrate") {
-                std::cout << "\nNote: DeepFace models will be downloaded on first use." << std::endl;
-                std::cout << "      This may take a moment for the first image." << std::endl;
+                std::cout << "\n" << Colors::warning("Note: ") << "DeepFace models will be downloaded on first use." << std::endl;
+                std::cout << Colors::warning("This may take a moment for the first image.") << std::endl;
             }
             
         } else {
@@ -295,38 +360,15 @@ int main(int argc, char* argv[]) {
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time);
         
-        // Final summary
-        std::cout << "\n" << std::string(60, '=') << std::endl;
-        std::cout << "PROCESSING SUMMARY" << std::endl;
-        std::cout << std::string(60, '=') << std::endl;
-        std::cout << "Total images processed: " << image_files.size() << std::endl;
-        std::cout << "Successful: " << successful_count << std::endl;
-        std::cout << "Failed: " << failed_count << std::endl;
-        std::cout << "Success rate: " << (successful_count * 100.0 / image_files.size()) << "%" << std::endl;
-        std::cout << "Total processing time: " << duration.count() << " seconds" << std::endl;
-        std::cout << "Average time per image: " << (duration.count() / static_cast<double>(image_files.size())) << " seconds" << std::endl;
+        // Print final summary
+        printFinalSummary(successful_count, failed_count, static_cast<int>(image_files.size()), 
+                         duration, options.mode);
         
-        if (failed_count > 0) {
-            std::cout << "\nSome images failed to process. Check the error messages above." << std::endl;
-        }
-        
-        if (successful_count > 0) {
-            std::cout << "\n🎉 Processing completed!" << std::endl;
-            std::cout << "Results saved to: " << options.output_dir << std::endl;
-            
-            if (options.is_batch) {
-                std::cout << "\nTo run evaluation on all processed images:" << std::endl;
-                std::cout << "  ./run_evaluation.sh" << std::endl;
-            }
-            
-            return (failed_count == 0) ? 0 : 1;
-        } else {
-            std::cerr << "\n❌ All images failed to process!" << std::endl;
-            return 1;
-        }
+        return (failed_count == 0) ? 0 : 1;
         
     } catch (const std::exception& e) {
-        std::cerr << "Fatal error: " << e.what() << std::endl;
+        std::cerr << "\n" << Colors::error("[FATAL ERROR] ") << e.what() << std::endl;
+        std::cerr << Colors::warning("Please check your input files and system configuration.") << std::endl;
         return -1;
     }
 }
