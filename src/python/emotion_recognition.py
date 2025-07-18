@@ -177,13 +177,14 @@ class EmotionRecognizer:
                 
                 # Find best emotion
                 predicted_emotion_key = max(emotion_data, key=emotion_data.get)
-                confidence = emotion_data[predicted_emotion_key] / 100.0
+                confidence = float(emotion_data[predicted_emotion_key] / 100.0)
                 
                 # Convert to standard format
                 predicted_emotion = self.emotion_labels.get(predicted_emotion_key, predicted_emotion_key.capitalize())
                 
+                # Convert all probabilities to Python floats for JSON serialization
                 all_probabilities = {
-                    self.emotion_labels.get(key, key.capitalize()): value / 100.0 
+                    self.emotion_labels.get(key, key.capitalize()): float(value / 100.0) 
                     for key, value in emotion_data.items()
                 }
                 
@@ -250,12 +251,13 @@ class EmotionRecognizer:
             # Predict emotion
             emotion, confidence, probabilities = self.predict_emotion(face_image)
             
+            # Ensure all values are JSON serializable
             result = {
                 'face_index': face_index,
                 'face_filename': face_filename,
                 'predicted_emotion': emotion,
-                'confidence': confidence,
-                'all_probabilities': probabilities
+                'confidence': float(confidence),  # Ensure it's a Python float
+                'all_probabilities': {k: float(v) for k, v in probabilities.items()}  # Convert all to Python floats
             }
             
             results.append(result)
@@ -282,12 +284,35 @@ class EmotionRecognizer:
         
         print(f"{Colors.success('Emotions saved to:')} {emotions_file}")
         
-        # Save detailed JSON results
+        # Save detailed JSON results with proper serialization
         json_file = f"{base_filename}_emotion_results.json"
-        with open(json_file, 'w') as f:
-            json.dump(results, f, indent=2)
-        
-        print(f"{Colors.success('Detailed results saved to:')} {json_file}")
+        try:
+            with open(json_file, 'w') as f:
+                json.dump(results, f, indent=2)
+            print(f"{Colors.success('Detailed results saved to:')} {json_file}")
+        except Exception as e:
+            print(Colors.error(f"Error saving JSON results: {e}"))
+            # Try to save with additional conversion
+            try:
+                # Convert any remaining numpy types to Python types
+                serializable_results = []
+                for result in results:
+                    serializable_result = {}
+                    for key, value in result.items():
+                        if isinstance(value, dict):
+                            serializable_result[key] = {k: float(v) if isinstance(v, (np.floating, np.integer)) else v 
+                                                      for k, v in value.items()}
+                        elif isinstance(value, (np.floating, np.integer)):
+                            serializable_result[key] = float(value)
+                        else:
+                            serializable_result[key] = value
+                    serializable_results.append(serializable_result)
+                
+                with open(json_file, 'w') as f:
+                    json.dump(serializable_results, f, indent=2)
+                print(f"{Colors.success('Detailed results saved to:')} {json_file}")
+            except Exception as e2:
+                print(Colors.error(f"Failed to save JSON results: {e2}"))
 
 def main():
     """
