@@ -1,34 +1,32 @@
 #!/usr/bin/python
 """
-Evaluation Module for Face Detection and Emotion Recognition System
-Calculates comprehensive performance metrics against ground truth data.
+Simplified Evaluation Module for Face Detection and Emotion Recognition System
+Directly compares unified results with ground truth labels.
 """
 
-import json
 import os
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
-import cv2
 
 class SystemEvaluator:
     def __init__(self):
         """Initialize the system evaluator."""
         self.emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+        self.class_to_emotion = {
+            0: 'Angry',
+            1: 'Disgust',
+            2: 'Fear', 
+            3: 'Happy',
+            4: 'Sad',
+            5: 'Surprise',
+            6: 'Neutral'
+        }
         
     def calculate_iou(self, box1, box2):
-        """
-        Calculate Intersection over Union (IoU) between two bounding boxes.
-        
-        Args:
-            box1, box2: [x, y, width, height] format
-            
-        Returns:
-            float: IoU value between 0 and 1
-        """
-        # Convert to [x1, y1, x2, y2] format
+        """Calculate IoU between two bounding boxes in [x, y, w, h] format."""
         x1_1, y1_1, w1, h1 = box1
         x2_1, y2_1 = x1_1 + w1, y1_1 + h1
         
@@ -45,34 +43,61 @@ class SystemEvaluator:
             return 0.0
             
         intersection = (x2_i - x1_i) * (y2_i - y1_i)
-        
-        # Calculate union
-        area1 = w1 * h1
-        area2 = w2 * h2
-        union = area1 + area2 - intersection
+        union = w1 * h1 + w2 * h2 - intersection
         
         return intersection / union if union > 0 else 0.0
     
-    def match_detections_to_ground_truth(self, predicted_boxes, ground_truth_boxes, iou_threshold=0.5):
-        """
-        Match predicted bounding boxes to ground truth boxes using IoU.
+    def parse_yolo_file(self, file_path, img_width=1280, img_height=853):
+        """Parse YOLO format file and return boxes and emotions."""
+        boxes = []
+        emotions = []
         
-        Args:
-            predicted_boxes: List of predicted bounding boxes
-            ground_truth_boxes: List of ground truth bounding boxes
-            iou_threshold: Minimum IoU for a positive match
+        if not os.path.exists(file_path):
+            return boxes, emotions
+        
+        try:
+            with open(file_path, 'r') as f:
+                content = f.read().strip()  # Read all content and strip whitespace
             
-        Returns:
-            tuple: (matches, unmatched_predictions, unmatched_ground_truths)
-        """
+            if not content:  # File is empty
+                return boxes, emotions
+                
+            lines = content.split('\n')  # Split by newlines
+            
+            for line in lines:
+                line = line.strip()
+                if line:  # Skip empty lines
+                    parts = line.split()
+                    if len(parts) == 5:
+                        emotion_class, center_x, center_y, width, height = map(float, parts)
+                        
+                        # Convert from YOLO to [x, y, width, height] format
+                        x = int((center_x - width/2) * img_width)
+                        y = int((center_y - height/2) * img_height)
+                        w = int(width * img_width)
+                        h = int(height * img_height)
+                        
+                        boxes.append([x, y, w, h])
+                        emotions.append(self.class_to_emotion.get(int(emotion_class), 'Neutral'))
+                        
+        except Exception as e:
+            print(f"Error parsing {file_path}: {e}")
+            
+        return boxes, emotions
+    
+    def match_faces(self, pred_boxes, pred_emotions, gt_boxes, gt_emotions, iou_threshold=0.5):
+        """Match predicted faces to ground truth faces using IoU."""
         matches = []
-        unmatched_predictions = list(range(len(predicted_boxes)))
-        unmatched_ground_truths = list(range(len(ground_truth_boxes)))
+        unmatched_pred = list(range(len(pred_boxes)))
+        unmatched_gt = list(range(len(gt_boxes)))
+        
+        if len(pred_boxes) == 0 or len(gt_boxes) == 0:
+            return matches, unmatched_pred, unmatched_gt
         
         # Calculate IoU matrix
-        iou_matrix = np.zeros((len(predicted_boxes), len(ground_truth_boxes)))
-        for i, pred_box in enumerate(predicted_boxes):
-            for j, gt_box in enumerate(ground_truth_boxes):
+        iou_matrix = np.zeros((len(pred_boxes), len(gt_boxes)))
+        for i, pred_box in enumerate(pred_boxes):
+            for j, gt_box in enumerate(gt_boxes):
                 iou_matrix[i, j] = self.calculate_iou(pred_box, gt_box)
         
         # Greedily match highest IoU pairs above threshold
@@ -87,163 +112,147 @@ class SystemEvaluator:
                 break
                 
             pred_idx, gt_idx = max_iou_idx
-            matches.append((pred_idx, gt_idx, max_iou))
+            matches.append((pred_idx, gt_idx, max_iou, 
+                          pred_emotions[pred_idx], gt_emotions[gt_idx]))
             
-            # Remove matched boxes from consideration
-            unmatched_predictions.remove(pred_idx)
-            unmatched_ground_truths.remove(gt_idx)
+            unmatched_pred.remove(pred_idx)
+            unmatched_gt.remove(gt_idx)
             
             # Set matched row and column to 0
             iou_matrix[pred_idx, :] = 0
             iou_matrix[:, gt_idx] = 0
         
-        return matches, unmatched_predictions, unmatched_ground_truths
+        return matches, unmatched_pred, unmatched_gt
     
-    def evaluate_face_detection(self, results_dir, ground_truth_file):
-        """
-        Evaluate face detection performance.
+    def evaluate_system(self, results_dir, labels_dir):
+        """Evaluate the system by comparing results with ground truth labels."""
         
-        Args:
-            results_dir: Directory containing detection results
-            ground_truth_file: JSON file with ground truth annotations
-            
-        Returns:
-            dict: Face detection metrics
-        """
-        with open(ground_truth_file, 'r') as f:
-            ground_truth = json.load(f)
+        # Find all unified results files
+        result_files = []
+        for file in os.listdir(results_dir):
+            if file.endswith('_unified_results.txt'):
+                result_files.append(file)
         
+        if not result_files:
+            print("Error: No unified results files found in results directory")
+            return None, None
+        
+        print(f"Found {len(result_files)} result files to evaluate")
+        
+        # Initialize metrics
         all_matches = []
-        all_predictions = 0
-        all_ground_truths = 0
+        all_pred_emotions = []
+        all_gt_emotions = []
+        total_predictions = 0
+        total_ground_truth = 0
         total_iou = 0.0
         
-        for image_name, gt_data in ground_truth.items():
-            # Look for corresponding results file
-            base_name = os.path.splitext(image_name)[0]
-            results_file = os.path.join(results_dir, f"{base_name}_emotion_results.json")
+        processed_files = 0
+        
+        for result_file in result_files:
+            # Extract base name: angry_1_unified_results.txt -> angry_1
+            base_name = result_file.replace('_unified_results.txt', '')
             
-            if not os.path.exists(results_file):
-                print(f"Warning: No results found for {image_name}")
+            # Look for corresponding label file
+            # Handle different naming conventions
+            possible_label_files = [
+                f"{base_name}.txt",
+                f"{base_name.replace('_', ' ')}.txt",
+                f"{base_name.replace('_', ' (')}.txt"
+            ]
+            
+            label_file = None
+            for possible_file in possible_label_files:
+                if os.path.exists(os.path.join(labels_dir, possible_file)):
+                    label_file = os.path.join(labels_dir, possible_file)
+                    break
+            
+            if not label_file:
+                print(f"Warning: No label file found for {base_name}")
                 continue
             
-            with open(results_file, 'r') as f:
-                results = json.load(f)
+            # Parse files
+            result_path = os.path.join(results_dir, result_file)
+            pred_boxes, pred_emotions = self.parse_yolo_file(result_path)
+            gt_boxes, gt_emotions = self.parse_yolo_file(label_file)
             
-            # Extract bounding boxes (need to reconstruct from face files)
-            predicted_boxes = []
-            for result in results:
-                face_file = result['face_filename']
-                if os.path.exists(face_file):
-                    # For simplicity, we'll use a placeholder box
-                    # In practice, you'd need to store the original bounding boxes
-                    predicted_boxes.append([0, 0, 100, 100])  # Placeholder
+            if not pred_boxes and not gt_boxes:
+                continue
             
-            gt_boxes = gt_data.get('bounding_boxes', [])
+            print(f"Processing {base_name}: {len(pred_boxes)} predicted, {len(gt_boxes)} ground truth")
             
-            # Match predictions to ground truth
-            matches, unmatched_pred, unmatched_gt = self.match_detections_to_ground_truth(
-                predicted_boxes, gt_boxes
+            # Match faces
+            matches, unmatched_pred, unmatched_gt = self.match_faces(
+                pred_boxes, pred_emotions, gt_boxes, gt_emotions
             )
             
             all_matches.extend(matches)
-            all_predictions += len(predicted_boxes)
-            all_ground_truths += len(gt_boxes)
+            total_predictions += len(pred_boxes)
+            total_ground_truth += len(gt_boxes)
             
-            # Calculate average IoU for matches
-            for _, _, iou in matches:
+            # Collect emotion predictions for matched faces
+            for match in matches:
+                pred_idx, gt_idx, iou, pred_emotion, gt_emotion = match
+                all_pred_emotions.append(pred_emotion)
+                all_gt_emotions.append(gt_emotion)
                 total_iou += iou
+            
+            processed_files += 1
         
-        # Calculate metrics
+        if processed_files == 0:
+            print("Error: No files could be processed")
+            return None, None
+        
+        # Calculate face detection metrics
         true_positives = len(all_matches)
-        false_positives = all_predictions - true_positives
-        false_negatives = all_ground_truths - true_positives
+        false_positives = total_predictions - true_positives
+        false_negatives = total_ground_truth - true_positives
         
         precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
         recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
         f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-        average_iou = total_iou / len(all_matches) if all_matches else 0
+        avg_iou = total_iou / len(all_matches) if all_matches else 0
         
-        return {
+        face_metrics = {
             'precision': precision,
             'recall': recall,
             'f1_score': f1_score,
-            'average_iou': average_iou,
+            'average_iou': avg_iou,
             'true_positives': true_positives,
             'false_positives': false_positives,
             'false_negatives': false_negatives
         }
-    
-    def evaluate_emotion_recognition(self, results_dir, ground_truth_file):
-        """
-        Evaluate emotion recognition performance.
         
-        Args:
-            results_dir: Directory containing emotion recognition results
-            ground_truth_file: JSON file with ground truth annotations
+        # Calculate emotion recognition metrics
+        emotion_metrics = {}
+        if all_pred_emotions:
+            accuracy = sum(p == g for p, g in zip(all_pred_emotions, all_gt_emotions)) / len(all_pred_emotions)
             
-        Returns:
-            dict: Emotion recognition metrics
-        """
-        with open(ground_truth_file, 'r') as f:
-            ground_truth = json.load(f)
-        
-        predicted_emotions = []
-        true_emotions = []
-        
-        for image_name, gt_data in ground_truth.items():
-            base_name = os.path.splitext(image_name)[0]
-            emotions_file = os.path.join(results_dir, f"{base_name}_emotions.txt")
+            # Generate classification report
+            report = classification_report(all_gt_emotions, all_pred_emotions, 
+                                         labels=self.emotion_labels, output_dict=True, zero_division=0)
             
-            if not os.path.exists(emotions_file):
-                print(f"Warning: No emotion results found for {image_name}")
-                continue
+            # Generate confusion matrix
+            cm = confusion_matrix(all_gt_emotions, all_pred_emotions, labels=self.emotion_labels)
             
-            # Read predicted emotions
-            with open(emotions_file, 'r') as f:
-                pred_emotions = [line.strip() for line in f.readlines() if line.strip()]
-            
-            gt_emotions = gt_data.get('emotions', [])
-            
-            # Match emotions (assuming same order as face detection)
-            min_count = min(len(pred_emotions), len(gt_emotions))
-            predicted_emotions.extend(pred_emotions[:min_count])
-            true_emotions.extend(gt_emotions[:min_count])
+            emotion_metrics = {
+                'accuracy': accuracy,
+                'classification_report': report,
+                'confusion_matrix': cm,
+                'predicted_emotions': all_pred_emotions,
+                'true_emotions': all_gt_emotions
+            }
         
-        if not predicted_emotions:
-            return {'accuracy': 0, 'classification_report': {}, 'confusion_matrix': np.array([])}
-        
-        # Calculate accuracy
-        accuracy = sum(p == t for p, t in zip(predicted_emotions, true_emotions)) / len(predicted_emotions)
-        
-        # Generate classification report
-        report = classification_report(true_emotions, predicted_emotions, 
-                                     labels=self.emotion_labels, output_dict=True, zero_division=0)
-        
-        # Generate confusion matrix
-        cm = confusion_matrix(true_emotions, predicted_emotions, labels=self.emotion_labels)
-        
-        return {
-            'accuracy': accuracy,
-            'classification_report': report,
-            'confusion_matrix': cm,
-            'predicted_emotions': predicted_emotions,
-            'true_emotions': true_emotions
-        }
+        print(f"\nProcessed {processed_files} files successfully")
+        return face_metrics, emotion_metrics
     
     def plot_confusion_matrix(self, cm, output_file='confusion_matrix.png'):
-        """
-        Plot and save confusion matrix.
-        
-        Args:
-            cm: Confusion matrix
-            output_file: Output file path
-        """
+        """Plot and save confusion matrix."""
         plt.figure(figsize=(10, 8))
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
                    xticklabels=self.emotion_labels, 
                    yticklabels=self.emotion_labels)
-        plt.title('Emotion Recognition Confusion Matrix')
+        plt.title('Emotion Recognition Confusion Matrix (DeepFace)')
         plt.xlabel('Predicted Emotion')
         plt.ylabel('True Emotion')
         plt.tight_layout()
@@ -251,20 +260,12 @@ class SystemEvaluator:
         plt.close()
         print(f"Confusion matrix saved to: {output_file}")
     
-    def generate_evaluation_report(self, face_metrics, emotion_metrics, output_file='evaluation_report.txt'):
-        """
-        Generate comprehensive evaluation report.
-        
-        Args:
-            face_metrics: Face detection metrics
-            emotion_metrics: Emotion recognition metrics
-            output_file: Output file path
-        """
+    def generate_report(self, face_metrics, emotion_metrics, output_file='evaluation_report.txt'):
+        """Generate comprehensive evaluation report."""
         with open(output_file, 'w') as f:
-            f.write("COMPREHENSIVE SYSTEM EVALUATION REPORT\n")
+            f.write("FACE DETECTION AND EMOTION RECOGNITION EVALUATION\n")
             f.write("=" * 50 + "\n\n")
             
-            # Face Detection Results
             f.write("FACE DETECTION PERFORMANCE\n")
             f.write("-" * 30 + "\n")
             f.write(f"Precision: {face_metrics['precision']:.3f}\n")
@@ -275,99 +276,78 @@ class SystemEvaluator:
             f.write(f"False Positives: {face_metrics['false_positives']}\n")
             f.write(f"False Negatives: {face_metrics['false_negatives']}\n\n")
             
-            # Emotion Recognition Results
-            f.write("EMOTION RECOGNITION PERFORMANCE\n")
-            f.write("-" * 35 + "\n")
+            f.write("EMOTION RECOGNITION PERFORMANCE (DeepFace)\n")
+            f.write("-" * 40 + "\n")
             f.write(f"Overall Accuracy: {emotion_metrics['accuracy']:.3f}\n\n")
             
-            if 'classification_report' in emotion_metrics:
-                f.write("Per-Class Performance:\n")
-                for emotion in self.emotion_labels:
-                    if emotion in emotion_metrics['classification_report']:
-                        metrics = emotion_metrics['classification_report'][emotion]
-                        f.write(f"  {emotion}:\n")
-                        f.write(f"    Precision: {metrics['precision']:.3f}\n")
-                        f.write(f"    Recall: {metrics['recall']:.3f}\n")
-                        f.write(f"    F1-Score: {metrics['f1-score']:.3f}\n")
-                        f.write(f"    Support: {metrics['support']}\n")
+            f.write("Per-Class Performance:\n")
+            for emotion in self.emotion_labels:
+                if emotion in emotion_metrics['classification_report']:
+                    metrics = emotion_metrics['classification_report'][emotion]
+                    f.write(f"  {emotion}:\n")
+                    f.write(f"    Precision: {metrics['precision']:.3f}\n")
+                    f.write(f"    Recall: {metrics['recall']:.3f}\n")
+                    f.write(f"    F1-Score: {metrics['f1-score']:.3f}\n")
+                    f.write(f"    Support: {metrics['support']}\n")
             
-            f.write(f"\nMacro Average:\n")
             if 'macro avg' in emotion_metrics['classification_report']:
                 macro = emotion_metrics['classification_report']['macro avg']
+                f.write(f"\nMacro Average:\n")
                 f.write(f"  Precision: {macro['precision']:.3f}\n")
                 f.write(f"  Recall: {macro['recall']:.3f}\n")
                 f.write(f"  F1-Score: {macro['f1-score']:.3f}\n")
-            
-            # System-Level Performance
-            f.write(f"\nSYSTEM-LEVEL PERFORMANCE\n")
-            f.write("-" * 25 + "\n")
-            total_faces_processed = len(emotion_metrics.get('predicted_emotions', []))
-            correctly_processed = sum(p == t for p, t in zip(
-                emotion_metrics.get('predicted_emotions', []),
-                emotion_metrics.get('true_emotions', [])
-            ))
-            system_accuracy = correctly_processed / total_faces_processed if total_faces_processed > 0 else 0
-            f.write(f"End-to-End Accuracy: {system_accuracy:.3f}\n")
-            f.write(f"Total Faces Processed: {total_faces_processed}\n")
-            f.write(f"Correctly Classified: {correctly_processed}\n")
         
         print(f"Evaluation report saved to: {output_file}")
 
 def main():
-    """
-    Main function for system evaluation.
-    """
+    """Main function for system evaluation."""
     if len(sys.argv) < 3:
-        print("Usage: python3 evaluation.py <results_directory> <ground_truth_file>")
-        print("Example: python3 evaluation.py ./output ground_truth.json")
-        print("\nGround truth file format:")
-        print('''{
-  "image1.jpg": {
-    "bounding_boxes": [[x, y, width, height], ...],
-    "emotions": ["Happy", "Sad", ...]
-  }
-}''')
+        print("Usage: python3 evaluation.py <results_directory> <labels_directory>")
+        print("Example: python3 evaluation.py ./output ./data/labels")
         return
     
     results_dir = sys.argv[1]
-    ground_truth_file = sys.argv[2]
+    labels_dir = sys.argv[2]
     
     if not os.path.exists(results_dir):
         print(f"Error: Results directory not found: {results_dir}")
         return
     
-    if not os.path.exists(ground_truth_file):
-        print(f"Error: Ground truth file not found: {ground_truth_file}")
+    if not os.path.exists(labels_dir):
+        print(f"Error: Labels directory not found: {labels_dir}")
         return
     
     try:
         evaluator = SystemEvaluator()
         
-        print("Evaluating face detection performance...")
-        face_metrics = evaluator.evaluate_face_detection(results_dir, ground_truth_file)
+        print("Evaluating system by comparing unified results with ground truth labels...")
+        face_metrics, emotion_metrics = evaluator.evaluate_system(results_dir, labels_dir)
         
-        print("Evaluating emotion recognition performance...")
-        emotion_metrics = evaluator.evaluate_emotion_recognition(results_dir, ground_truth_file)
+        if face_metrics is None or emotion_metrics is None:
+            print("Evaluation failed!")
+            return
         
         # Plot confusion matrix
-        if emotion_metrics['confusion_matrix'].size > 0:
+        if 'confusion_matrix' in emotion_metrics and emotion_metrics['confusion_matrix'].size > 0:
             evaluator.plot_confusion_matrix(emotion_metrics['confusion_matrix'])
         
-        # Generate comprehensive report
-        evaluator.generate_evaluation_report(face_metrics, emotion_metrics)
+        # Generate report
+        evaluator.generate_report(face_metrics, emotion_metrics)
         
-        # Print summary to console
-        print("\n" + "="*50)
+        # Print summary
+        print("\n" + "="*60)
         print("EVALUATION SUMMARY")
-        print("="*50)
+        print("="*60)
         print(f"Face Detection F1-Score: {face_metrics['f1_score']:.3f}")
+        print(f"Face Detection Average IoU: {face_metrics['average_iou']:.3f}")
         print(f"Emotion Recognition Accuracy: {emotion_metrics['accuracy']:.3f}")
-        print(f"Average IoU: {face_metrics['average_iou']:.3f}")
-        print("="*50)
+        print(f"Total Faces Evaluated: {len(emotion_metrics.get('predicted_emotions', []))}")
+        print("="*60)
         
     except Exception as e:
         print(f"Error during evaluation: {e}")
-        return 1
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()

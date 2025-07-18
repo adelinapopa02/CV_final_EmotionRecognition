@@ -3,6 +3,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <filesystem>
+#include <map>
 
 Integration::Integration(
     const std::string& cascade_file,
@@ -35,16 +36,38 @@ bool Integration::runFaceDetectionOnly(const std::string& image_path) {
         // Detect faces
         std::vector<cv::Rect> faces = face_detector.detectFaces(image);
 
-        if (faces.empty()) {
-            std::cout << "No faces detected in the image." << std::endl;
-            return true; // Not an error, just no faces found
-        }
-
         // Generate output filenames
         std::string base_filename = getBaseFilename(image_path);
-        std::string output_image = base_filename + "_faces_detected.jpg";
+
+        if (faces.empty()) {
+            std::cout << "No faces detected in the image." << std::endl;
+            std::cout << "Creating empty results file." << std::endl;
+            
+            // Create empty unified results file
+            std::vector<std::string> empty_emotions;
+            saveUnifiedResults(image, faces, empty_emotions, base_filename);
+            
+            // Create empty detection result image (just the original image)
+            std::string output_image = base_filename + "_faces_detected.jpg";
+            if (!cv::imwrite(output_image, image)) {
+                std::cerr << "Error: Could not save result image to " << output_image << std::endl;
+                return false;
+            }
+            std::cout << "Result saved to: " << output_image << std::endl;
+            
+            std::cout << "\n=== FACE DETECTION SUMMARY ===" << std::endl;
+            std::cout << "Total faces detected: 0" << std::endl;
+            std::cout << "Face detection completed successfully!" << std::endl;
+            
+            return true;
+        }
+
+        // Save unified results (detection only, no emotions)
+        std::vector<std::string> empty_emotions;
+        saveUnifiedResults(image, faces, empty_emotions, base_filename);
 
         // Draw bounding boxes and save result
+        std::string output_image = base_filename + "_faces_detected.jpg";
         cv::Mat result_image = face_detector.drawFaceBoxes(image, faces);
         if (!cv::imwrite(output_image, result_image)) {
             std::cerr << "Error: Could not save result image to " << output_image << std::endl;
@@ -85,22 +108,49 @@ bool Integration::runCompleteIntegration(const std::string& image_path) {
         std::cout << "\nStep 1: Face Detection" << std::endl;
         std::vector<cv::Rect> faces = face_detector.detectFaces(image);
 
+        // Generate output filenames
+        std::string base_filename = getBaseFilename(image_path);
+
         if (faces.empty()) {
-            std::cout << "No faces detected. Process completed." << std::endl;
+            std::cout << "No faces detected. Creating empty results file." << std::endl;
+            
+            // Create empty unified results file
+            std::vector<std::string> empty_emotions;
+            saveUnifiedResults(image, faces, empty_emotions, base_filename);
+            
+            // Create final result image (just the original image)
+            std::string final_output = base_filename + "_final_result.jpg";
+            if (!cv::imwrite(final_output, image)) {
+                std::cerr << "Error: Could not save final result to " << final_output << std::endl;
+                return false;
+            }
+            std::cout << "Final result saved to: " << final_output << std::endl;
+            
+            std::cout << "\n=== INTEGRATION SUMMARY ===" << std::endl;
+            std::cout << "Total faces detected: 0" << std::endl;
+            std::cout << "Emotions recognized: 0" << std::endl;
+            std::cout << "\nOutput files created:" << std::endl;
+            std::cout << "- " << final_output << " (final result)" << std::endl;
+            std::cout << "- " << base_filename + "_unified_results.txt (empty results)" << std::endl;
+            std::cout << "Complete integration completed successfully!" << std::endl;
+            
             return true;
         }
 
         // Step 2: Save face regions
         std::cout << "\nStep 2: Extracting Face Regions" << std::endl;
-        std::string base_filename = getBaseFilename(image_path);
         std::vector<std::string> face_files = face_detector.saveFaceRegions(image, faces, base_filename);
 
         // Step 3: Emotion Recognition
         std::cout << "\nStep 3: Emotion Recognition" << std::endl;
         std::vector<std::string> emotions = runEmotionRecognition(base_filename);
 
-        // Step 4: Create final result
-        std::cout << "\nStep 4: Creating Final Result" << std::endl;
+        // Step 4: Save unified results (emotion + coordinates)
+        std::cout << "\nStep 4: Saving Unified Results" << std::endl;
+        saveUnifiedResults(image, faces, emotions, base_filename);
+
+        // Step 5: Create final result
+        std::cout << "\nStep 5: Creating Final Result" << std::endl;
         cv::Mat final_result = createFinalResult(image, faces, emotions);
         
         std::string final_output = base_filename + "_final_result.jpg";
@@ -110,7 +160,18 @@ bool Integration::runCompleteIntegration(const std::string& image_path) {
         }
         std::cout << "Final result saved to: " << final_output << std::endl;
 
-        // Step 5: Print summary
+        // Step 6: Clean up remaining temporary files
+        std::cout << "\nStep 6: Cleaning up temporary files" << std::endl;
+        
+        // Delete emotion_results.json file (emotions.txt is already deleted)
+        std::string json_file = base_filename + "_emotion_results.json";
+        
+        if (std::filesystem::exists(json_file)) {
+            std::filesystem::remove(json_file);
+            std::cout << "Deleted temporary file: " << json_file << std::endl;
+        }
+        
+        // Step 7: Print summary
         std::cout << "\n=== INTEGRATION SUMMARY ===" << std::endl;
         std::cout << "Total faces detected: " << faces.size() << std::endl;
         std::cout << "Emotions recognized: " << emotions.size() << std::endl;
@@ -121,8 +182,7 @@ bool Integration::runCompleteIntegration(const std::string& image_path) {
         
         std::cout << "\nOutput files created:" << std::endl;
         std::cout << "- " << final_output << " (final result with annotations)" << std::endl;
-        std::cout << "- " << base_filename + "_emotions.txt (emotion predictions)" << std::endl;
-        std::cout << "- " << base_filename + "_emotion_results.json (detailed results)" << std::endl;
+        std::cout << "- " << base_filename + "_unified_results.txt (unified emotion + coordinates)" << std::endl;
         
         for (const auto& face_file : face_files) {
             std::cout << "- " << face_file << " (extracted face region)" << std::endl;
@@ -143,7 +203,7 @@ std::vector<std::string> Integration::runEmotionRecognition(const std::string& b
     // Construct Python command
     auto quote = [](const std::string &s){ return "\"" + s + "\""; };
     std::string python_command = 
-        "python3 " 
+        "/Users/adelinapopa/miniforge3_arm64/envs/cv_native/bin/python3 " 
         + quote(python_script_path) + " " 
         + quote(base_filename)                       
         + (model_path.empty() ? "" : " " + quote(model_path));
@@ -172,11 +232,65 @@ std::vector<std::string> Integration::runEmotionRecognition(const std::string& b
         }
         file.close();
         std::cout << "Successfully read " << emotions.size() << " emotion predictions" << std::endl;
+        
+        // Delete the temporary emotions file immediately after reading
+        std::filesystem::remove(emotions_file);
     } else {
         std::cerr << "Warning: Could not read emotions file: " << emotions_file << std::endl;
     }
     
     return emotions;
+}
+
+void Integration::saveUnifiedResults(const cv::Mat& image, const std::vector<cv::Rect>& faces, const std::vector<std::string>& emotions, const std::string& base_filename) {
+    std::string unified_file = base_filename + "_unified_results.txt";
+    
+    // Emotion to class ID mapping (matching your ground truth labels)
+    std::map<std::string, int> emotion_to_class = {
+        {"Angry", 0},
+        {"Disgust", 1}, 
+        {"Fear", 2},
+        {"Happy", 3},
+        {"Sad", 4},
+        {"Surprise", 5},
+        {"Neutral", 6}
+    };
+    
+    std::ofstream file(unified_file);
+    if (file.is_open()) {
+        // If no faces detected, create empty file
+        if (faces.empty()) {
+            file.close();
+            std::cout << "Empty unified results saved to: " << unified_file << std::endl;
+            return;
+        }
+        
+        for (size_t i = 0; i < faces.size(); ++i) {
+            const auto& face = faces[i];
+            
+            // Get emotion class ID
+            int emotion_class = 6; // Default to Neutral if not found
+            if (i < emotions.size()) {
+                auto it = emotion_to_class.find(emotions[i]);
+                if (it != emotion_to_class.end()) {
+                    emotion_class = it->second;
+                }
+            }
+            
+            // Convert to YOLO format (normalized coordinates)
+            double center_x = (face.x + face.width / 2.0) / image.cols;
+            double center_y = (face.y + face.height / 2.0) / image.rows;
+            double width = face.width / (double)image.cols;
+            double height = face.height / (double)image.rows;
+            
+            // Write in format: emotion_class center_x center_y width height
+            file << emotion_class << " " << center_x << " " << center_y << " " << width << " " << height << std::endl;
+        }
+        file.close();
+        std::cout << "Unified results saved to: " << unified_file << std::endl;
+    } else {
+        std::cerr << "Error: Could not create unified results file: " << unified_file << std::endl;
+    }
 }
 
 cv::Mat Integration::createFinalResult(const cv::Mat& image, const std::vector<cv::Rect>& faces, const std::vector<std::string>& emotions) {
