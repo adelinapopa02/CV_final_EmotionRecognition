@@ -2,20 +2,22 @@
 #define INTEGRATION_H
 
 #include "FaceDetector.h"
+#include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>
 
-/**
- * SystemIntegrator Class
- * 
- * Handles the complete face detection + emotion recognition pipeline.
- * Orchestrates the integration between C++ face detection and Python emotion recognition.
- */
 class Integration {
+public:
+    Integration(const std::string& cascade_file, const std::string& python_script, const std::string& emotion_model);
+    
+    bool runFaceDetectionOnly(const std::string& image_path);
+    bool runCompleteIntegration(const std::string& image_path);
+
 private:
     FaceDetector face_detector;
     std::string python_script_path;
     std::string model_path;
+<<<<<<< HEAD
 
 public:
     /**
@@ -50,24 +52,12 @@ private:
      * @param base_filename Base filename for face images
      * @return Vector of emotion predictions
      */
+=======
+    
+>>>>>>> deepface-version
     std::vector<std::string> runEmotionRecognition(const std::string& base_filename);
-
-    /**
-     * Create final annotated result with face boxes and emotion labels
-     * @param image Original image
-     * @param faces Vector of face rectangles
-     * @param emotions Vector of emotion labels
-     * @return Annotated image
-     */
-    cv::Mat createFinalResult(const cv::Mat& image, 
-                             const std::vector<cv::Rect>& faces, 
-                             const std::vector<std::string>& emotions);
-
-    /**
-     * Extract base filename from full path
-     * @param filepath Full path to file
-     * @return Base filename without extension
-     */
+    void saveUnifiedResults(const cv::Mat& image, const std::vector<cv::Rect>& faces, const std::vector<std::string>& emotions, const std::string& base_filename);
+    cv::Mat createFinalResult(const cv::Mat& image, const std::vector<cv::Rect>& faces, const std::vector<std::string>& emotions);
     std::string getBaseFilename(const std::string& filepath);
 };
 

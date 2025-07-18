@@ -5,8 +5,50 @@ project(FaceEmotionDetection)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find OpenCV package
-find_package(OpenCV REQUIRED)
+# Let CMake auto-detect architecture on macOS
+if(APPLE)
+    message(STATUS "Building for macOS - auto-detecting architecture")
+endif()
+
+# Find OpenCV package - try multiple approaches
+# First try to find OpenCV in standard locations
+find_package(OpenCV QUIET)
+
+if(NOT OpenCV_FOUND)
+    # Try Homebrew locations for different architectures
+    if(APPLE)
+        # Try Apple Silicon Homebrew location
+        set(OpenCV_DIR "/opt/homebrew/lib/cmake/opencv4")
+        find_package(OpenCV QUIET PATHS "/opt/homebrew" NO_DEFAULT_PATH)
+        
+        # Try Intel Mac Homebrew location if Apple Silicon didn't work
+        if(NOT OpenCV_FOUND)
+            set(OpenCV_DIR "/usr/local/lib/cmake/opencv4")
+            find_package(OpenCV QUIET PATHS "/usr/local" NO_DEFAULT_PATH)
+        endif()
+        
+        # Try MacPorts location
+        if(NOT OpenCV_FOUND)
+            set(OpenCV_DIR "/opt/local/lib/cmake/opencv4")
+            find_package(OpenCV QUIET PATHS "/opt/local" NO_DEFAULT_PATH)
+        endif()
+    endif()
+endif()
+
+# Final attempt - require OpenCV and let it fail with helpful message if not found
+if(NOT OpenCV_FOUND)
+    message(STATUS "OpenCV not found in standard locations.")
+    message(STATUS "Please install OpenCV using one of these methods:")
+    message(STATUS "  brew install opencv")
+    message(STATUS "  sudo port install opencv4  (if using MacPorts)")
+    message(STATUS "Or set OpenCV_DIR manually: cmake -DOpenCV_DIR=/path/to/opencv/cmake ..")
+    find_package(OpenCV REQUIRED)
+endif()
+
+# Print OpenCV information for debugging
+message(STATUS "OpenCV version: ${OpenCV_VERSION}")
+message(STATUS "OpenCV include dirs: ${OpenCV_INCLUDE_DIRS}")
+message(STATUS "OpenCV libraries: ${OpenCV_LIBS}")
 
 # Include OpenCV headers
 include_directories(${OpenCV_INCLUDE_DIRS})
@@ -99,9 +141,16 @@ add_custom_target(usage
     COMMAND echo "  ./face_emotion_system --detect-only ../data/images/happy_1.jpg"
     COMMAND echo "  ./face_emotion_system --integrate ../data/images/happy_1.jpg"
     COMMAND echo ""
+<<<<<<< HEAD
     COMMAND echo "Models location: build/models/"
     COMMAND echo "  - haarcascade_frontalface_alt.xml"
     COMMAND echo "  - emotion_model.keras (or emotion_model.h5)"
     COMMAND echo ""
     COMMAND echo "To manually download models: make download_models"
+=======
+    COMMAND echo "Setup Python environment first:"
+    COMMAND echo "  python3 -m venv cv_native"
+    COMMAND echo "  source cv_native/bin/activate"
+    COMMAND echo "  pip install opencv-python deepface numpy matplotlib seaborn scikit-learn"
+>>>>>>> deepface-version
 )

@@ -1,20 +1,16 @@
 # build artifacts
 /build/
-/CMakeFiles/
+/MakeFiles/
 /CMakeCache.txt
-/*.cmake
-/*.Makefile
-
+/*- cmake
+/* Makefile
 # VSCode settings
-.vscode/
-
+- vscode/
 # Python
-__pycache__/
-/*.pyc
-/models/emotion_model.keras
-/data/images/*_face_*.jpg
+_pycache_/
+/*-pyc
+/models/emotion_model. keras /data/ images/*_face_*.jpg
 /data/images/*_final_result.jpg
 /output/
-
-# MacOS
-.DS_Store
+# MacoS
+- DS_Store
